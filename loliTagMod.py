@@ -17,27 +17,31 @@ def authenticate():
 def main():
     global reddit
     reddit = authenticate()
-    # commentsRepliedTo = getSavedComments()
+    commentsRepliedTo = getSavedComments()
     # # postsRepliedTo = getSavedPosts()
     while True:
-        run_bot()
+        run_bot(commentsRepliedTo)
 
 
-def run_bot():
+def run_bot(commentsRepliedTo, postsRepliedTo=[]):
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching comments...")
-    # readMessages = []
     # to limit fetched comments use comments(limit=int)
     for comment in reddit.subreddit(PARSED_SUBREDDIT).comments(limit=100):
-        if not comment.banned_by and comment.author not in doNotReplyList:
-            # replyString = ""
+        if comment.id not in commentsRepliedTo and comment.author not in doNotReplyList:
+            replyString = ""
             cmt = comment.body
             # print(cmt)
             tagResultCache = getTagResultCache(cmt)
             # Check if tagResultCache is not empty.
             if tagResultCache:
-                comment.mod.remove()
-            #     replyString = generateReplyString(tagResultCache, 0)
+                # comment.mod.remove()
+                replyString = generateReplyString(tagResultCache, 0)
+            if replyString:
+                print("Reporting: " + comment.id)
+                reportComment(replyString, comment)
+                # comment.report(replyString, comment)
+                commentsRepliedTo.append(comment.id)
             # # Check if a reply was generated
             # if replyString:
             #     # post the string and save the replied to comment to not analyse and reply again
@@ -47,13 +51,18 @@ def run_bot():
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching posts...")
     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=10):
-        if not submission.banned_by:
-            # replyString = ""
+        print(submission.title)
+        if submission.id not in postsRepliedTo:
+            replyString = ""
             title = submission.title
             tagResultCache = getTagResultCache(title)
             if tagResultCache:
-                submission.mod.remove()
-                # replyString = generateReplyString(tagResultCache, 1)
+                # submission.mod.remove()
+                replyString = generateReplyString(tagResultCache, 1)
+            if replyString:
+                print("reporting: " + submission.id)
+                submission.report(replyString)
+                postsRepliedTo.append(submission.id)
             # if replyString:
             #     print(replyString)
             #     postsRepliedTo.append(submission.id)
@@ -63,25 +72,29 @@ def run_bot():
     time.sleep(30)
 
 
-# def writeCommentReply(replyString, comment):
-#     print("Commenting with: \n")
-#     print(replyString)
-#     # post the replyString to reddit as a reply
-#     reply = comment.reply(replyString)
-#     # also write it to file to enable reloading after shutdown
-#     with open("commentsRepliedTo.txt", "a") as f:
-#         f.write(comment.id + "\n")
-#     return reply
+def reportComment(replyString, comment):
+    # post the replyString to reddit as a reply
+    comment.report(replyString)
+    # also write it to file to enable reloading after shutdown
+    with open("commentsRepliedTo.txt", "a") as f:
+        f.write(comment.id + "\n")
 
 
-# def generateReplyString(tagResultCache, subType):
-#     replyString = ""
-#     if tagResultCache:
-#         if subType == 0:
-#             replyString += "Your comment was found to violate the no loli rule by including a number that contains loli content."
-#         if subType == 1:
-#             replyString += "Your submission title was found to violate the no loli rule by including a number that contains loli content"
-#     return replyString
+def generateReplyString(tagResultCache, subType):
+    replyString = ""
+    if tagResultCache:
+        if subType == 0:
+            if tagResultCache[0]:
+                replyString += "7.2 Loli number "
+            if tagResultCache[1]:
+                replyString += "7.2 Shota number "
+        if subType == 1:
+            if tagResultCache[0]:
+                replyString += "7.2 Loli number "
+            if tagResultCache[1]:
+                replyString += "7.2 Shota number "
+    print(replyString)
+    return replyString
 
 
 
@@ -98,8 +111,8 @@ def getTagResultCache(cmt):
             # get the tags from the nHentai API function
             tagResult = retrieveTags(number)
             if tagResult:
-                if tagResult[0]:
-                    return True
+                if tagResult[0] or tagResult[1]:
+                    return tagResult
     return False
 
 
@@ -156,13 +169,26 @@ def retrieveTags(galleryNumber):
             return []
         else:
             isLoli = False
+            isShota = False
             for tags in nhentaiTags['tags']:
                 # checks for loli
                 if 'lolicon' in tags['name']:
                     isLoli = True
                 if 'shotacon' in tags['name']:
-                    isLoli = True
-            return [isLoli]
+                    isShota = True
+            return [isLoli, isShota]
+
+
+def getSavedComments():
+    # return an empty list if empty
+    if not os.path.isfile("commentsRepliedTo.txt"):
+        commentsRepliedTo = []
+    else:
+        with open("commentsRepliedTo.txt", "r") as f:
+            # updated read file method from https://stackoverflow.com/questions/3925614/how-do-you-read-a-file-into-a-list-in-python
+            commentsRepliedTo = f.read().splitlines()
+
+    return commentsRepliedTo
 
 
 if __name__ == '__main__':
