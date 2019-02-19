@@ -51,7 +51,7 @@ def run_bot(commentsRepliedTo, postsRepliedTo=[]):
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching posts...")
     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=10):
-        print(submission.title)
+        # print(submission.title)
         if submission.id not in postsRepliedTo:
             replyString = ""
             title = submission.title
