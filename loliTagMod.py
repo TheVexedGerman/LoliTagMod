@@ -1,11 +1,15 @@
 import praw, time, requests, os, re, datetime, json
+import wrapper.tsumino as tsumino
+import wrapper.nhentai as nhentai
+import wrapper.hitomila as hitomila
+import wrapper.ehentai as ehentai
 
 # the API URL defined for easy adjustment
 API_URL = 'https://nhentai.net/g/'
 PARSED_SUBREDDIT = 'Animemes'
 # PARSED_SUBREDDIT = 'loli_tag_bot'
 
-doNotReplyList = ['HelperBot_', 'YTubeInfoBot', 'RemindMeBot', 'anti-gif-bot', 'Roboragi', 'sneakpeekbot', 'tweettranscriberbot', 'WhyNotCollegeBoard']
+doNotReplyList = ['Roboragi', 'WhyNotCollegeBoard']
 
 def authenticate():
     print("Authenticating...")
