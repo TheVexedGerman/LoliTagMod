@@ -6,10 +6,16 @@ import re
 import datetime
 import json
 #should import the site wrappers for the sites from the nhentai bot
-import wrapper.tsumino as tsumino
 import wrapper.nhentai as nhentai
-import wrapper.hitomila as hitomila
+import wrapper.tsumino as tsumino
 import wrapper.ehentai as ehentai
+import wrapper.hitomila as hitomila
+
+nhentaiKey = 0
+tsuminoKey = 1
+ehentaiKey = 2
+hitomilaKey = 3
+
 
 doNotReplyList = ['Roboragi', 'WhyNotCollegeBoard']
 
@@ -46,36 +52,54 @@ def run_bot(commentsReported, commentsChecked):
 
 
 def checkForViolation(comment):
+    replyString = ""
+    #URLs
     numbers = nhentai.scanURL(comment)
-    if not numbers:
-        numbers = getNumbers(comment)
-    if numbers:
-        for number in numbers:
-            currentCheck = nhentai.analyseNumber(number)
-            if currentCheck[-1]:
-                return "7.2 Violation: Nhentai URL"
+    replyString = scanNumbers(numbers, nhentaiKey, "URL")
+    if replyString: return replyString
 
     numbers = tsumino.scanURL(comment)
-    if numbers:
-        for number in numbers:
-            currentCheck = tsumino.analyseNumber(number)
-            if currentCheck[-1]:
-                return "7.2 Violation: Tsumino URL"
+    replyString = scanNumbers(numbers, tsuminoKey, "URL")
+    if replyString: return replyString
 
     numbers = ehentai.scanURL(comment)
-    if numbers:
-        for number in numbers:
-            currentCheck = ehentai.analyseNumber(number)
-            if currentCheck[-1]:
-                return "7.2 Violation: Exhentai URL"
+    replyString = scanNumbers(numbers, ehentaiKey, "URL")
+    if replyString: return replyString
 
     numbers = hitomila.scanURL(comment)
+    replyString = scanNumbers(numbers, nhentaiKey, "URL")
+    if replyString: return replyString
+
+    if not numbers:
+        numbers = getNumbers(comment)
+
+
+def scanNumbers(numbers, key, additionalInfo):
+    replyString = ""
     if numbers:
         for number in numbers:
-            currentCheck = hitomila.analyseNumber(number)
-            if currentCheck[-1]:
-                return "7.2 Violation: Hitomi.la URL"
+            if key == nhentaiKey:
+                site = "Nhentai"
+                currentCheck = nhentai.analyseNumber(number)
+            elif key == tsuminoKey:
+                site = "Tsumino"
+                currentCheck = tsumino.analyseNumber(number)
+            elif key == ehentaiKey:
+                site = "E-hentai"
+                currentCheck = ehentai.analyseNumber(number)
+            elif key == hitomilaKey:
+                site = "Hitomi.la"
+                currentCheck = hitomila.analyseNumber(number)
+            if len(currentCheck) > 1 and currentCheck[-1]:
+                replyString = generateReportString(site, additionalInfo)
+    return replyString
+                
 
+def generateReportString(site, additionalInfo, kind="Violation", prepend=""):
+    replyString = "7.2 " + kind + ": " + site + " " + additionalInfo
+    if prepend:
+        replyString = prepend + " " + replyString
+    return replyString
 
 def getNumbers(cmt):
     # find and replace with nothing to elimnate URLs from the string.
