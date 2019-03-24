@@ -43,12 +43,20 @@ def run_bot(commentsReported, commentsChecked):
     print("Fetching comments...")
     # to limit fetched comments use comments(limit=int)
     for comment in reddit.subreddit(PARSED_SUBREDDIT).comments(limit=100):
+        # commentsChecked to prevent unedited repeats
         if comment.id not in commentsReported or (comment.id not in commentsChecked and not comment.edited) or comment.author not in doNotReplyList:
             replyString = ""
             print(comment.body)
             replyString = checkForViolation
             commentsChecked.append(comment.id)
+        if replyString:
+            if comment.subreddit in REPORTING_SUBREDDIT:
+                reportComment(replyString, comment)
+            if comment.subreddit in MODDING_SUBREDDIT:
+                comment.mod.remove()
+                commentsReported.append(comment.id)
         commentsChecked = commentsChecked[-100:]
+        commentsReported = commentsReported[-100:]
 
 
 def checkForViolation(comment):
@@ -70,11 +78,34 @@ def checkForViolation(comment):
     replyString = scanNumbers(numbers, nhentaiKey, "URL")
     if replyString: return replyString
 
-    if not numbers:
-        numbers = getNumbers(comment)
+    # bot number lookup
+    numbers = nhentai.getNumbers(comment)
+    replyString = scanNumbers(numbers, nhentaiKey, "bot call")
+    if replyString: return replyString
+    
+    numbers = tsumino.getNumbers(comment)
+    replyString = scanNumbers(numbers, tsuminoKey, "bot call")
+    if replyString: return replyString
+
+    numbers = ehentai.getNumbers(comment)
+    replyString = scanNumbers(numbers, ehentaiKey, "bot call")
+    if replyString: return replyString
+    
+    numbers = hitomila.getNumbers(comment)
+    replyString = scanNumbers(numbers, hitomilaKey, "bot call")
+    if replyString: return replyString
+    # expanded search criteria
+    # any continuous 5 to 6 digit number
+    numbers = re.findall(r'\d{5,6}', comment)
+    replyString = scanNumbers(numbers, nhentaiKey, "")
+    if replyString: return replyString
+    
+    # Loli tag bot criteria
+    numbers = getNumbers(comment)
+    replyString = scanNumbers(numbers, nhentaiKey, "expanded check criteria", prepend="Potential")
 
 
-def scanNumbers(numbers, key, additionalInfo):
+def scanNumbers(numbers, key, additionalInfo, prepend=""):
     replyString = ""
     if numbers:
         for number in numbers:
@@ -91,7 +122,9 @@ def scanNumbers(numbers, key, additionalInfo):
                 site = "Hitomi.la"
                 currentCheck = hitomila.analyseNumber(number)
             if len(currentCheck) > 1 and currentCheck[-1]:
-                replyString = generateReportString(site, additionalInfo)
+                kind = "Violation"
+                #TODO figure out the kind of banned content detected.
+                replyString = generateReportString(site, additionalInfo, kind=kind, prepend=prepend)
     return replyString
                 
 
@@ -101,13 +134,14 @@ def generateReportString(site, additionalInfo, kind="Violation", prepend=""):
         replyString = prepend + " " + replyString
     return replyString
 
+
 def getNumbers(cmt):
     # find and replace with nothing to elimnate URLs from the string.
     cmt = re.sub(r'https?:\/\/\S+', '', cmt)
     ## remove decimal numbers to prevent them from being parsed
     # cmt = re.sub(r'\d+\.\d+', '', cmt)
     # remove numbers the nHentaiTagBot is looking for
-    #T sumino
+    #Tsumino
     cmt = re.sub(r'(?<=\))\d{5}(?=\()', '', cmt)
     # ehentai
     cmt = re.sub(r'(?<=\})\d{1,8}\/\w*?(?=\{)', '', cmt)
@@ -141,7 +175,14 @@ def getNumbersFromString(cmt):
     numbers = re.findall(r'(?<![\/=\d\w-])\d\s*\d\s*\d\s*\d\s*\d\s*\d?\b', cmt)
     return numbers
 
-
+def reportComment(replyString, comment):
+    # trim to max report length
+    replyString = replyString[:100]
+    # report with the replyString Message
+    comment.report(replyString)
+    # also write it to file to enable reloading after shutdown
+    with open("commentsRepliedTo.txt", "a") as f:
+        f.write(comment.id + "\n")
 
 def getSavedCommentIDs():
     # return an empty list if empty
@@ -153,6 +194,7 @@ def getSavedCommentIDs():
             commentsReported = f.read().splitlines()
 
     return commentsReported
+
 
 if __name__ == '__main__':
     while True:
