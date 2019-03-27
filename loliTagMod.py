@@ -32,7 +32,7 @@ def run_bot(commentsRepliedTo, postsRepliedTo=[]):
         if comment:
             if (time.time() - lastCheckedTime) > TIME_BETWEEN_CHECKS:
                 checkSubmissions(postsRepliedTo)
-                lastCheckedPMsTime = time.time()
+                lastCheckedTime = time.time()
         if comment.id not in commentsRepliedTo and comment.author not in doNotReplyList:
             replyString = ""
             cmt = comment.body
