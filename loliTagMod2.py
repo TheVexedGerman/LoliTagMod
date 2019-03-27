@@ -53,7 +53,9 @@ def run_bot(commentsReported, commentsRemoved):
         if (comment.id not in commentsReported) and (comment.id not in commentsRemoved) and ((comment.id not in commentsChecked) and not comment.edited) and (comment.author not in doNotReplyList):
             print(comment.body)
             replyString = checkForViolation(comment.body)
-            commentsChecked.append(comment.id)
+            if replyString == True:
+                commentsChecked.append(comment.id)
+                continue
         if replyString:
             if comment.subreddit in REPORTING_SUBREDDIT:
                 reportComment(replyString, comment)
@@ -135,13 +137,32 @@ def scanNumbers(numbers, key, additionalInfo, prepend=""):
             elif key == hitomilaKey:
                 site = "Hitomi.la"
                 currentCheck = hitomila.analyseNumber(number)
-            if len(currentCheck) > 1 and currentCheck[-1]:
-                kind = "Violation"
-                #TODO figure out the kind of banned content detected.
-                additionalInfo += " " + str(number)
-                replyString = generateReportString(site, additionalInfo, kind=kind, prepend=prepend)
+            if len(currentCheck) > 1:
+                if currentCheck[-1]:
+                    kind = "Violation"
+                    #TODO figure out the kind of banned content detected.
+                    additionalInfo += " " + str(number)
+                    replyString = generateReportString(site, additionalInfo, kind=kind, prepend=prepend)
+                else:
+                    return True
     return replyString
                 
+
+def getKindOfViolation(currentCheck, key):
+    if key == nhentaiKey:
+        for entry in currentCheck[2]:
+            if 'loli' in entry[0]:
+                return "Loli"
+            elif 'shota' in entry[0]:
+                return 'shota'
+    if key == tsuminoKey:
+        for entry in tag:
+            if 'loli' in entry.lower():
+                isRedacted = True
+            elif 'shota' in entry.lower():
+                isRedacted = True
+
+
 
 def generateReportString(site, additionalInfo, kind="Violation", prepend=""):
     replyString = "7.2 " + kind + ": " + site + " " + additionalInfo
