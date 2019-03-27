@@ -4,6 +4,7 @@ import praw, time, requests, os, re, datetime, json
 API_URL = 'https://nhentai.net/g/'
 PARSED_SUBREDDIT = 'Animemes'
 # PARSED_SUBREDDIT = 'loli_tag_bot'
+TIME_BETWEEN_CHECKS = 30
 
 doNotReplyList = ['HelperBot_', 'YTubeInfoBot', 'RemindMeBot', 'anti-gif-bot', 'Roboragi', 'sneakpeekbot', 'tweettranscriberbot', 'WhyNotCollegeBoard']
 
@@ -26,8 +27,11 @@ def main():
 def run_bot(commentsRepliedTo, postsRepliedTo=[]):
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching comments...")
-    # to limit fetched comments use comments(limit=int)
-    for comment in reddit.subreddit(PARSED_SUBREDDIT).comments(limit=100):
+    lastCheckedTime = time.time()
+    for comment in reddit.subreddit(PARSED_SUBREDDIT).stream.comments():
+        if comment:
+            if (time.time() - lastCheckedTime) > TIME_BETWEEN_CHECKS:
+                checkSubmissions(postsRepliedTo)
         if comment.id not in commentsRepliedTo and comment.author not in doNotReplyList:
             replyString = ""
             cmt = comment.body
@@ -48,6 +52,13 @@ def run_bot(commentsRepliedTo, postsRepliedTo=[]):
             #     # print("PrePost" + replyString)               
             #     writeCommentReply(replyString, comment)
     # do the same for titles as it does for comments
+    
+    # Sleep for 30 seconds...
+    # print("Sleeping for 30 seconds...")
+    # time.sleep(30)
+
+
+def checkSubmissions(postsRepliedTo):
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching posts...")
     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=10):
@@ -67,9 +78,6 @@ def run_bot(commentsRepliedTo, postsRepliedTo=[]):
             #     print(replyString)
             #     postsRepliedTo.append(submission.id)
             #     submission.reply(replyString)
-    # Sleep for 30 seconds...
-    print("Sleeping for 30 seconds...")
-    time.sleep(30)
 
 
 def reportComment(replyString, comment):
