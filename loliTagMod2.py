@@ -20,12 +20,12 @@ hitomilaKey = 3
 commentsChecked = []
 doNotReplyList = ['Roboragi', 'WhyNotCollegeBoard']
 
-PARSED_SUBREDDIT = 'Animemes'
-REPORTING_SUBREDDIT = ['Animemes']
-# REPORTING_SUBREDDIT = ['loli_tag_bot']
+# PARSED_SUBREDDIT = 'Animemes'
+PARSED_SUBREDDIT = 'loli_tag_bot'
+# REPORTING_SUBREDDIT = ['Animemes']
+REPORTING_SUBREDDIT = ['loli_tag_bot']
 # MODDING_SUBREDDIT = ['loli_tag_bot']
 MODDING_SUBREDDIT = []
-# PARSED_SUBREDDIT = 'loli_tag_bot'
 
 def authenticate():
     print("Authenticating...")
@@ -47,15 +47,14 @@ def run_bot(commentsReported, commentsRemoved):
     global commentsChecked
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching comments...")
-    # to limit fetched comments use comments(limit=int)
     for comment in reddit.subreddit(PARSED_SUBREDDIT).comments(limit=100):
         replyString = ""
-        if (comment.id not in commentsReported) and (comment.id not in commentsRemoved) and ((comment.id not in commentsChecked) and not comment.edited) and (comment.author not in doNotReplyList):
-            print(comment.body)
+        print(comment.body)
+        #Check of the comment was already reported, check if it was already removed, check if it was checked before and then edited, and check if it is a known safe user.
+        if (comment.id not in commentsReported) and (comment.id not in commentsRemoved) and not commentCheckedAndEdited(comment) and (comment.author not in doNotReplyList):
+            print("Checking")
             replyString = checkForViolation(comment.body)
-            if replyString == True:
-                commentsChecked.append(comment.id)
-                continue
+            commentsChecked.append([comment.id, comment.body])
         if replyString:
             if comment.subreddit in REPORTING_SUBREDDIT:
                 reportComment(replyString, comment)
@@ -66,7 +65,14 @@ def run_bot(commentsReported, commentsRemoved):
         commentsChecked = commentsChecked[-100:]
         commentsReported = commentsReported[-100:]
     print("Sleeping for 30 seconds...")
-    time.sleep(10)
+    time.sleep(30)
+
+
+def commentCheckedAndEdited(comment):
+    for entry in commentsChecked:
+        if comment.id == entry[0] and comment.body == entry[1]:
+            return True
+    return False
 
 
 def checkForViolation(comment):
@@ -137,31 +143,38 @@ def scanNumbers(numbers, key, additionalInfo, prepend=""):
             elif key == hitomilaKey:
                 site = "Hitomi.la"
                 currentCheck = hitomila.analyseNumber(number)
-            if len(currentCheck) > 1:
-                if currentCheck[-1]:
-                    kind = "Violation"
-                    #TODO figure out the kind of banned content detected.
-                    additionalInfo += " " + str(number)
-                    replyString = generateReportString(site, additionalInfo, kind=kind, prepend=prepend)
-                else:
-                    return True
+            if len(currentCheck) > 1 and currentCheck[-1]:
+                kind = "Violation"
+                kind = getKindOfViolation(currentCheck, key)
+                additionalInfo += " " + str(number)
+                replyString = generateReportString(site, additionalInfo, kind=kind, prepend=prepend)
     return replyString
                 
-
 def getKindOfViolation(currentCheck, key):
     if key == nhentaiKey:
         for entry in currentCheck[2]:
             if 'loli' in entry[0]:
                 return "Loli"
             elif 'shota' in entry[0]:
-                return 'shota'
+                return 'Shota'
     if key == tsuminoKey:
-        for entry in tag:
+        for entry in currentCheck[7]:
             if 'loli' in entry.lower():
-                isRedacted = True
+                return "Loli"
             elif 'shota' in entry.lower():
-                isRedacted = True
-
+                return 'Shota'
+    if key == ehentaiKey:
+        if "loli" in currentCheck[6]:
+            return "Loli"
+        if "shota" in currentCheck[8]:
+            return "Shota"
+    if key == hitomila:
+        for entry in currentCheck[8]:
+            if 'loli' in entry.lower():
+                return "Loli"
+            elif 'shota' in entry.lower():
+                return 'Shota'
+    return "Violation"
 
 
 def generateReportString(site, additionalInfo, kind="Violation", prepend=""):
