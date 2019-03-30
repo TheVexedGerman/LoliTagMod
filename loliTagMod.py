@@ -1,12 +1,30 @@
-import praw, time, requests, os, re, datetime, json
+import praw
+import time
+import requests
+import os
+import re
+import datetime
+import json
+#imports the site wrappers for the sites from the nhentai bot
+import wrapper.nhentai as nhentai
+import wrapper.tsumino as tsumino
+import wrapper.ehentai as ehentai
+import wrapper.hitomila as hitomila
 
-# the API URL defined for easy adjustment
-API_URL = 'https://nhentai.net/g/'
+nhentaiKey = 0
+tsuminoKey = 1
+ehentaiKey = 2
+hitomilaKey = 3
+
+commentsChecked = []
+doNotReplyList = ['Roboragi', 'WhyNotCollegeBoard']
+
 PARSED_SUBREDDIT = 'Animemes'
 # PARSED_SUBREDDIT = 'loli_tag_bot'
-TIME_BETWEEN_CHECKS = 30
-
-doNotReplyList = ['HelperBot_', 'YTubeInfoBot', 'RemindMeBot', 'anti-gif-bot', 'Roboragi', 'sneakpeekbot', 'tweettranscriberbot', 'WhyNotCollegeBoard']
+REPORTING_SUBREDDIT = ['Animemes']
+# REPORTING_SUBREDDIT = ['loli_tag_bot']
+# MODDING_SUBREDDIT = ['loli_tag_bot']
+MODDING_SUBREDDIT = []
 
 def authenticate():
     print("Authenticating...")
@@ -14,125 +32,173 @@ def authenticate():
     print("Authenticated as {}".format(reddit.user.me()))
     return reddit
 
-
 def main():
     global reddit
     reddit = authenticate()
-    commentsRepliedTo = getSavedComments()
-    # # postsRepliedTo = getSavedPosts()
+    commentsReported = getSavedCommentIDs()
+    commentsRemoved = getRemovedCommentIDs()
     while True:
-        run_bot(commentsRepliedTo)
+        run_bot(commentsReported, commentsRemoved)
 
-
-def run_bot(commentsRepliedTo, postsRepliedTo=[]):
+def run_bot(commentsReported, commentsRemoved):
+    # if passed as an argument the list gets reset fix with global assignment wtf???
+    global commentsChecked
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching comments...")
-    lastCheckedTime = time.time()
-    for comment in reddit.subreddit(PARSED_SUBREDDIT).stream.comments():
-        if comment:
-            if (time.time() - lastCheckedTime) > TIME_BETWEEN_CHECKS:
-                checkSubmissions(postsRepliedTo)
-                lastCheckedTime = time.time()
-        if comment.id not in commentsRepliedTo and comment.author not in doNotReplyList:
-            replyString = ""
-            cmt = comment.body
-            # print(cmt)
-            tagResultCache = getTagResultCache(cmt)
-            # Check if tagResultCache is not empty.
-            if tagResultCache:
-                # comment.mod.remove()
-                replyString = generateReplyString(tagResultCache, 0)
-            if replyString:
-                print("Reporting: " + comment.id)
+    for comment in reddit.subreddit(PARSED_SUBREDDIT).comments(limit=100):
+        replyString = ""
+        print(comment.body)
+        #Check of the comment was already reported, check if it was already removed, check if it was checked before and then edited, and check if it is a known safe user.
+        if (comment.id not in commentsReported) and (comment.id not in commentsRemoved) and not commentCheckedAndEdited(comment) and (comment.author not in doNotReplyList):
+            print("Checking")
+            replyString = checkForViolation(comment.body)
+            commentsChecked.append([comment.id, comment.body])
+        if replyString:
+            if comment.subreddit in REPORTING_SUBREDDIT:
                 reportComment(replyString, comment)
-                # comment.report(replyString, comment)
-                commentsRepliedTo.append(comment.id)
-            # # Check if a reply was generated
-            # if replyString:
-            #     # post the string and save the replied to comment to not analyse and reply again
-            #     # print("PrePost" + replyString)               
-            #     writeCommentReply(replyString, comment)
-    # do the same for titles as it does for comments
-    
-    # Sleep for 30 seconds...
-    # print("Sleeping for 30 seconds...")
-    # time.sleep(30)
+                commentsReported.append(comment.id)
+            if comment.subreddit in MODDING_SUBREDDIT:
+                comment.mod.remove()
+                commentsReported.append(comment.id)
+        #Trim list length to prevent it getting too large
+        commentsChecked = commentsChecked[-100:]
+        commentsReported = commentsReported[-100:]
+    print("Sleeping for 30 seconds...")
+    time.sleep(30)
 
 
-def checkSubmissions(postsRepliedTo):
-    print("Current time: " + str(datetime.datetime.now().time()))
-    print("Fetching posts...")
-    for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=10):
-        # print(submission.title)
-        if submission.id not in postsRepliedTo:
-            replyString = ""
-            title = submission.title
-            tagResultCache = getTagResultCache(title)
-            if tagResultCache:
-                # submission.mod.remove()
-                replyString = generateReplyString(tagResultCache, 1)
-            if replyString:
-                print("reporting: " + submission.id)
-                submission.report(replyString)
-                postsRepliedTo.append(submission.id)
-            # if replyString:
-            #     print(replyString)
-            #     postsRepliedTo.append(submission.id)
-            #     submission.reply(replyString)
-
-
-def reportComment(replyString, comment):
-    # post the replyString to reddit as a reply
-    comment.report(replyString)
-    # also write it to file to enable reloading after shutdown
-    with open("commentsRepliedTo.txt", "a") as f:
-        f.write(comment.id + "\n")
-
-
-def generateReplyString(tagResultCache, subType):
-    replyString = ""
-    if tagResultCache:
-        if subType == 0:
-            if tagResultCache[0]:
-                replyString += "7.2 Loli number "
-            if tagResultCache[1]:
-                replyString += "7.2 Shota number "
-        if subType == 1:
-            if tagResultCache[0]:
-                replyString += "7.2 Loli number "
-            if tagResultCache[1]:
-                replyString += "7.2 Shota number "
-    print(replyString)
-    return replyString
-
-
-
-def getTagResultCache(cmt):
-    print(cmt)
-    numbers = getNumbers(cmt)
-    # checks if the list is empty
-    if numbers:
-        print("Numbers available")
-        print(numbers)
-        # iterates over the list
-        for number in numbers:
-            print(number)
-            # get the tags from the nHentai API function
-            tagResult = retrieveTags(number)
-            if tagResult:
-                if tagResult[0] or tagResult[1]:
-                    return tagResult
+def commentCheckedAndEdited(comment):
+    for entry in commentsChecked:
+        if comment.id == entry[0] and comment.body == entry[1]:
+            return True
     return False
 
 
-def getNumbers(cmt):
+def checkForViolation(comment):
+    replyString = ""
+    #URLs
+    numbers = nhentai.scanURL(comment)
+    replyString = scanNumbers(numbers, nhentaiKey, "URL")
+    if replyString: return replyString
+
+    numbers = tsumino.scanURL(comment)
+    replyString = scanNumbers(numbers, tsuminoKey, "URL")
+    if replyString: return replyString
+
+    numbers = ehentai.scanURL(comment)
+    replyString = scanNumbers(numbers, ehentaiKey, "URL")
+    if replyString: return replyString
+
+    numbers = hitomila.scanURL(comment)
+    replyString = scanNumbers(numbers, nhentaiKey, "URL")
+    if replyString: return replyString
+
+    # bot number lookup
+    numbers = nhentai.getNumbers(comment)
+    replyString = scanNumbers(numbers, nhentaiKey, "bot call")
+    if replyString: return replyString
+    
+    numbers = tsumino.getNumbers(comment)
+    replyString = scanNumbers(numbers, tsuminoKey, "bot call")
+    if replyString: return replyString
+
+    numbers = ehentai.getNumbers(comment)
+    replyString = scanNumbers(numbers, ehentaiKey, "bot call")
+    if replyString: return replyString
+    
+    numbers = hitomila.getNumbers(comment)
+    replyString = scanNumbers(numbers, hitomilaKey, "bot call")
+    if replyString: return replyString
+    # expanded search criteria
+    # any continuous 5 to 6 digit number
+    comment = removeOtherSiteCalls(comment)
+
+    numbers = re.findall(r'\d{5,6}(?!\d)', comment)
+    try:
+        numbers = [int(number) for number in numbers]
+    except ValueError:
+        numbers = []
+    replyString = scanNumbers(numbers, nhentaiKey, "")
+    if replyString: return replyString
+    
+    # Loli tag bot criteria
+    numbers = getNumbers(comment)
+    replyString = scanNumbers(numbers, nhentaiKey, "expanded check criteria", prepend="Potential")
+
+
+def scanNumbers(numbers, key, additionalInfo, prepend=""):
+    replyString = ""
+    if numbers:
+        for number in numbers:
+            if key == nhentaiKey:
+                site = "Nhentai"
+                currentCheck = nhentai.analyseNumber(number)
+            elif key == tsuminoKey:
+                site = "Tsumino"
+                currentCheck = tsumino.analyseNumber(number)
+            elif key == ehentaiKey:
+                site = "E-hentai"
+                currentCheck = ehentai.analyseNumber(number)
+            elif key == hitomilaKey:
+                site = "Hitomi.la"
+                currentCheck = hitomila.analyseNumber(number)
+            if len(currentCheck) > 1 and currentCheck[-1]:
+                kind = "Violation"
+                kind = getKindOfViolation(currentCheck, key)
+                additionalInfo += " " + str(number)
+                replyString = generateReportString(site, additionalInfo, kind=kind, prepend=prepend)
+    return replyString
+                
+def getKindOfViolation(currentCheck, key):
+    if key == nhentaiKey:
+        for entry in currentCheck[2]:
+            if 'loli' in entry[0]:
+                return "Loli"
+            elif 'shota' in entry[0]:
+                return 'Shota'
+    if key == tsuminoKey:
+        for entry in currentCheck[7]:
+            if 'loli' in entry.lower():
+                return "Loli"
+            elif 'shota' in entry.lower():
+                return 'Shota'
+    if key == ehentaiKey:
+        if "loli" in currentCheck[6]:
+            return "Loli"
+        if "shota" in currentCheck[8]:
+            return "Shota"
+    if key == hitomila:
+        for entry in currentCheck[8]:
+            if 'loli' in entry.lower():
+                return "Loli"
+            elif 'shota' in entry.lower():
+                return 'Shota'
+    return "Violation"
+
+
+def generateReportString(site, additionalInfo, kind="Violation", prepend=""):
+    replyString = "7.2 " + kind + " number: " + site + " " + additionalInfo
+    if prepend:
+        replyString = prepend + " " + replyString
+    return replyString
+
+
+def removeOtherSiteCalls(cmt):
     # find and replace with nothing to elimnate URLs from the string.
-    if not re.findall(r'https?:\/\/(?:www.)?nhentai.net', cmt):
-        cmt = re.sub(r'https?:\/\/\S+', '', cmt)
-    # remove decimal numbers to prevent them from being parsed
-    cmt = re.sub(r'\d+\.\d+', '', cmt)
+    cmt = re.sub(r'https?:\/\/\S+', '', cmt)
     # remove numbers the nHentaiTagBot is looking for
+    # Nhentai
+    cmt = re.sub(r'(?<=\()\d{5,6}(?=\))', '', cmt)
+    #Tsumino
     cmt = re.sub(r'(?<=\))\d{5}(?=\()', '', cmt)
+    # ehentai
+    cmt = re.sub(r'(?<=\})\d{1,8}\/\w*?(?=\{)', '', cmt)
+    # hitomila
+    cmt = re.sub(r'(?<=(?<!\>)\!)\d{5,8}(?=\!(?!\<))', '', cmt)
+    return cmt
+
+
+def getNumbers(cmt):
     # improved parser that'll hopefully not catch anything with less than 4 digits and spaced digits.
     numbers = getNumbersFromString(cmt)
     # if the standard search doesn't find anything do a special search
@@ -161,43 +227,37 @@ def getNumbersFromString(cmt):
     numbers = re.findall(r'(?<![\/=\d\w-])\d\s*\d\s*\d\s*\d\s*\d\s*\d?\b', cmt)
     return numbers
 
+def reportComment(replyString, comment):
+    # trim to max report length
+    replyString = replyString[:100]
+    # report with the replyString Message
+    comment.report(replyString)
+    # also write it to file to enable reloading after shutdown
+    with open("commentsReported.txt", "a") as f:
+        f.write(comment.id + "\n")
+    with open("commentsReportReasons.csv", "a", encoding="UTF-8") as f:
+        f.write(comment.id + ",\"" + comment.body + "\"," + replyString + "," + comment.author +"\n")
 
-def retrieveTags(galleryNumber):
-    # checks if the number is close to the current max to prevent using astronomical numbers
-    if galleryNumber < 300000:
-        # make galleryNumber a String for concat
-        galleryNumber = str(galleryNumber)
-        # nhentaiTags = requests.get(API_URL+galleryNumber).json() # ['tags'] #
-        request = requests.get(API_URL + str(galleryNumber))
-        # catch erounious requests
-        if request.status_code != 200:
-            return []
-        nhentaiTags = json.loads(re.search(r'(?<=N.gallery\().*(?=\))', request.text).group(0))
-        # catch returns for invalid numbers
-        if "error" in nhentaiTags:
-            return []
-        else:
-            isLoli = False
-            isShota = False
-            for tags in nhentaiTags['tags']:
-                # checks for loli
-                if 'lolicon' in tags['name']:
-                    isLoli = True
-                if 'shotacon' in tags['name']:
-                    isShota = True
-            return [isLoli, isShota]
-
-
-def getSavedComments():
+def getSavedCommentIDs():
     # return an empty list if empty
-    if not os.path.isfile("commentsRepliedTo.txt"):
-        commentsRepliedTo = []
+    if not os.path.isfile("commentsReported.txt"):
+        commentsReported = []
     else:
-        with open("commentsRepliedTo.txt", "r") as f:
+        with open("commentsReported.txt", "r") as f:
             # updated read file method from https://stackoverflow.com/questions/3925614/how-do-you-read-a-file-into-a-list-in-python
-            commentsRepliedTo = f.read().splitlines()
+            commentsReported = f.read().splitlines()
+    return commentsReported
 
-    return commentsRepliedTo
+
+def getRemovedCommentIDs():
+    # return an empty list if empty
+    if not os.path.isfile("commentsRemoved.txt"):
+        commentsRemoved = []
+    else:
+        with open("commentsRemoved.txt", "r") as f:
+            # updated read file method from https://stackoverflow.com/questions/3925614/how-do-you-read-a-file-into-a-list-in-python
+            commentsRemoved = f.read().splitlines()
+    return commentsRemoved
 
 
 if __name__ == '__main__':
