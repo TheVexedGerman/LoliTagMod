@@ -16,14 +16,13 @@ tsuminoKey = 1
 ehentaiKey = 2
 hitomilaKey = 3
 
-
 commentsChecked = []
 doNotReplyList = ['Roboragi', 'WhyNotCollegeBoard']
 
-# PARSED_SUBREDDIT = 'Animemes'
-PARSED_SUBREDDIT = 'loli_tag_bot'
-# REPORTING_SUBREDDIT = ['Animemes']
-REPORTING_SUBREDDIT = ['loli_tag_bot']
+PARSED_SUBREDDIT = 'Animemes'
+# PARSED_SUBREDDIT = 'loli_tag_bot'
+REPORTING_SUBREDDIT = ['Animemes']
+# REPORTING_SUBREDDIT = ['loli_tag_bot']
 # MODDING_SUBREDDIT = ['loli_tag_bot']
 MODDING_SUBREDDIT = []
 
@@ -38,7 +37,6 @@ def main():
     reddit = authenticate()
     commentsReported = getSavedCommentIDs()
     commentsRemoved = getRemovedCommentIDs()
-    # global commentsChecked
     while True:
         run_bot(commentsReported, commentsRemoved)
 
@@ -62,6 +60,7 @@ def run_bot(commentsReported, commentsRemoved):
             if comment.subreddit in MODDING_SUBREDDIT:
                 comment.mod.remove()
                 commentsReported.append(comment.id)
+        #Trim list length to prevent it getting too large
         commentsChecked = commentsChecked[-100:]
         commentsReported = commentsReported[-100:]
     print("Sleeping for 30 seconds...")
@@ -178,7 +177,7 @@ def getKindOfViolation(currentCheck, key):
 
 
 def generateReportString(site, additionalInfo, kind="Violation", prepend=""):
-    replyString = "7.2 " + kind + ": " + site + " " + additionalInfo
+    replyString = "7.2 " + kind + " number: " + site + " " + additionalInfo
     if prepend:
         replyString = prepend + " " + replyString
     return replyString
@@ -236,6 +235,8 @@ def reportComment(replyString, comment):
     # also write it to file to enable reloading after shutdown
     with open("commentsReported.txt", "a") as f:
         f.write(comment.id + "\n")
+    with open("commentsReportReasons.csv", "a", encoding="UTF-8") as f:
+        f.write(comment.id + ",\"" + comment.body + "\"," + replyString + "," + comment.author +"\n")
 
 def getSavedCommentIDs():
     # return an empty list if empty
