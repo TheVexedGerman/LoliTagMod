@@ -236,7 +236,7 @@ def reportComment(replyString, comment):
     with open("commentsReported.txt", "a") as f:
         f.write(comment.id + "\n")
     with open("commentsReportReasons.csv", "a", encoding="UTF-8") as f:
-        f.write(comment.id + ",\"" + comment.body + "\"," + replyString + "," + comment.author +"\n")
+        f.write(comment.id + ",\"" + comment.body + "\"," + replyString + "," + str(comment.author) +"\n")
 
 def getSavedCommentIDs():
     # return an empty list if empty
