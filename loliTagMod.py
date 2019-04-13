@@ -35,14 +35,14 @@ def authenticate():
 def main():
     global reddit
     reddit = authenticate()
-    # global commentsReported
+    global commentsReported
     commentsReported = getSavedCommentIDs()
     # global commentsRemoved
     commentsRemoved = getRemovedCommentIDs()
     while True:
-        run_bot(commentsReported, commentsRemoved)
+        run_bot(commentsRemoved)
 
-def run_bot(commentsReported, commentsRemoved):
+def run_bot(commentsRemoved):
     # if passed as an argument the list gets reset fix with global assignment wtf???
     global commentsChecked
     global commentsReported
