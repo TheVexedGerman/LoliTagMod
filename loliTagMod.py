@@ -35,7 +35,9 @@ def authenticate():
 def main():
     global reddit
     reddit = authenticate()
+    # global commentsReported
     commentsReported = getSavedCommentIDs()
+    # global commentsRemoved
     commentsRemoved = getRemovedCommentIDs()
     while True:
         run_bot(commentsReported, commentsRemoved)
@@ -47,24 +49,51 @@ def run_bot(commentsReported, commentsRemoved):
     print("Fetching comments...")
     for comment in reddit.subreddit(PARSED_SUBREDDIT).comments(limit=100):
         replyString = ""
-        print(comment.body)
+        print(f"Comment: {comment.body}")
+        # print((comment.id not in commentsReported) and (comment.id not in commentsRemoved) and not commentCheckedAndEdited(comment) and (comment.author not in doNotReplyList))
         #Check of the comment was already reported, check if it was already removed, check if it was checked before and then edited, and check if it is a known safe user.
-        if (comment.id not in commentsReported) and (comment.id not in commentsRemoved) and not commentCheckedAndEdited(comment) and (comment.author not in doNotReplyList):
-            print("Checking")
-            replyString = checkForViolation(comment.body)
-            commentsChecked.append([comment.id, comment.body])
+        print(f"Check Comment: {(comment.id not in commentsReported) and (comment.id not in commentsRemoved) and (comment.author not in doNotReplyList)}")
+        if (comment.id not in commentsReported) and (comment.id not in commentsRemoved) and (comment.author not in doNotReplyList):
+            # print("Checking")
+            print(commentsReported)
+            print(commentsChecked)
+            list_comment = commentInList(comment)
+            print(f"Found list comment: {list_comment}")
+            if list_comment:
+                # print(comment.body)
+                print(f"List comment text: {list_comment[1]}")
+                print(f"Chached matches fetched: {comment.body == list_comment[1]}")
+                if not comment.body == list_comment[1]:
+                    replyString = checkForViolation(comment.body)
+                    updateSavedComment(comment, list_comment)
+            else:
+                replyString = checkForViolation(comment.body)
+                commentsChecked.append([comment.id, comment.body])
+        print(f"Report Sting is: {replyString}")
         if replyString:
             if comment.subreddit in REPORTING_SUBREDDIT:
                 reportComment(replyString, comment)
                 commentsReported.append(comment.id)
             if comment.subreddit in MODDING_SUBREDDIT:
                 comment.mod.remove()
-                commentsReported.append(comment.id)
+                commentsRemoved.append(comment.id)
         #Trim list length to prevent it getting too large
         commentsChecked = commentsChecked[-100:]
         commentsReported = commentsReported[-100:]
     print("Sleeping for 30 seconds...")
     time.sleep(30)
+
+
+def commentInList(comment):
+    for entry in commentsChecked:
+        if comment.id == entry[0]:
+            return entry
+    return []
+
+
+def updateSavedComment(comment, commentChecked):
+    global commentsChecked
+    commentsChecked[commentsChecked.index(commentChecked)] = [comment.id, comment.body]
 
 
 def commentCheckedAndEdited(comment):
@@ -75,6 +104,7 @@ def commentCheckedAndEdited(comment):
 
 
 def checkForViolation(comment):
+    print("checkforviolation being run")
     replyString = ""
     #URLs
     numbers = nhentai.scanURL(comment)
