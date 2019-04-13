@@ -82,7 +82,7 @@ def run_bot(commentsRemoved):
         commentsChecked = commentsChecked[-100:]
         commentsReported = commentsReported[-100:]
     print("Sleeping for 30 seconds...")
-    time.sleep(30)
+    time.sleep(20)
 
 
 def commentInList(comment):
