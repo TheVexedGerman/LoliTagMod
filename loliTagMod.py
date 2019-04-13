@@ -45,6 +45,7 @@ def main():
 def run_bot(commentsReported, commentsRemoved):
     # if passed as an argument the list gets reset fix with global assignment wtf???
     global commentsChecked
+    global commentsReported
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching comments...")
     for comment in reddit.subreddit(PARSED_SUBREDDIT).comments(limit=100):
@@ -56,13 +57,13 @@ def run_bot(commentsReported, commentsRemoved):
         if (comment.id not in commentsReported) and (comment.id not in commentsRemoved) and (comment.author not in doNotReplyList):
             # print("Checking")
             print(commentsReported)
-            print(commentsChecked)
+            # print(commentsChecked)
             list_comment = commentInList(comment)
             print(f"Found list comment: {list_comment}")
             if list_comment:
                 # print(comment.body)
                 print(f"List comment text: {list_comment[1]}")
-                print(f"Chached matches fetched: {comment.body == list_comment[1]}")
+                print(f"Cached matches fetched: {comment.body == list_comment[1]}")
                 if not comment.body == list_comment[1]:
                     replyString = checkForViolation(comment.body)
                     updateSavedComment(comment, list_comment)
