@@ -79,10 +79,10 @@ def run_bot(commentsRemoved):
                 comment.mod.remove()
                 commentsRemoved.append(comment.id)
         #Trim list length to prevent it getting too large
-        commentsChecked = commentsChecked[-100:]
-        commentsReported = commentsReported[-100:]
+    commentsChecked = commentsChecked[-100:]
+    commentsReported = commentsReported[-100:]
     print("Sleeping for 30 seconds...")
-    time.sleep(20)
+    time.sleep(30)
 
 
 def commentInList(comment):
@@ -144,7 +144,7 @@ def checkForViolation(comment):
     # any continuous 5 to 6 digit number
     comment = removeOtherSiteCalls(comment)
 
-    numbers = re.findall(r'\d{5,6}(?!\d)', comment)
+    numbers = re.findall(r'(?<!\d)\d{5,6}(?!\d)', comment)
     try:
         numbers = [int(number) for number in numbers]
     except ValueError:
