@@ -155,6 +155,7 @@ def checkForViolation(comment):
     # Loli tag bot criteria
     numbers = getNumbers(comment)
     replyString = scanNumbers(numbers, nhentaiKey, "expanded check criteria", prepend="Potential")
+    if replyString: return replyString
 
 
 def scanNumbers(numbers, key, additionalInfo, prepend=""):
