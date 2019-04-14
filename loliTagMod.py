@@ -49,6 +49,7 @@ def run_bot(commentsRemoved):
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching comments...")
     for comment in reddit.subreddit(PARSED_SUBREDDIT).comments(limit=100):
+        print(comment.permalink)
         replyString = ""
         print(f"Comment: {comment.body}")
         # print((comment.id not in commentsReported) and (comment.id not in commentsRemoved) and not commentCheckedAndEdited(comment) and (comment.author not in doNotReplyList))
@@ -125,37 +126,37 @@ def checkForViolation(comment):
     if replyString: return replyString
 
     # bot number lookup
-    numbers = nhentai.getNumbers(comment)
-    replyString = scanNumbers(numbers, nhentaiKey, "bot call")
-    if replyString: return replyString
+    # numbers = nhentai.getNumbers(comment)
+    # replyString = scanNumbers(numbers, nhentaiKey, "bot call")
+    # if replyString: return replyString
     
-    numbers = tsumino.getNumbers(comment)
-    replyString = scanNumbers(numbers, tsuminoKey, "bot call")
-    if replyString: return replyString
+    # numbers = tsumino.getNumbers(comment)
+    # replyString = scanNumbers(numbers, tsuminoKey, "bot call")
+    # if replyString: return replyString
 
-    numbers = ehentai.getNumbers(comment)
-    replyString = scanNumbers(numbers, ehentaiKey, "bot call")
-    if replyString: return replyString
+    # numbers = ehentai.getNumbers(comment)
+    # replyString = scanNumbers(numbers, ehentaiKey, "bot call")
+    # if replyString: return replyString
     
-    numbers = hitomila.getNumbers(comment)
-    replyString = scanNumbers(numbers, hitomilaKey, "bot call")
-    if replyString: return replyString
+    # numbers = hitomila.getNumbers(comment)
+    # replyString = scanNumbers(numbers, hitomilaKey, "bot call")
+    # if replyString: return replyString
     # expanded search criteria
     # any continuous 5 to 6 digit number
-    comment = removeOtherSiteCalls(comment)
+    # comment = removeOtherSiteCalls(comment)
 
-    numbers = re.findall(r'(?<!\d)\d{5,6}(?!\d)', comment)
-    try:
-        numbers = [int(number) for number in numbers]
-    except ValueError:
-        numbers = []
-    replyString = scanNumbers(numbers, nhentaiKey, "continuous number")
-    if replyString: return replyString
+    # numbers = re.findall(r'(?<!\d)\d{5,6}(?!\d)', comment)
+    # try:
+    #     numbers = [int(number) for number in numbers]
+    # except ValueError:
+    #     numbers = []
+    # replyString = scanNumbers(numbers, nhentaiKey, "continuous number")
+    # if replyString: return replyString
     
-    # Loli tag bot criteria
-    numbers = getNumbers(comment)
-    replyString = scanNumbers(numbers, nhentaiKey, "expanded check criteria", prepend="Potential")
-    if replyString: return replyString
+    # # Loli tag bot criteria
+    # numbers = getNumbers(comment)
+    # replyString = scanNumbers(numbers, nhentaiKey, "expanded check criteria", prepend="Potential")
+    # if replyString: return replyString
 
 
 def scanNumbers(numbers, key, additionalInfo, prepend=""):
