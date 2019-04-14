@@ -149,7 +149,7 @@ def checkForViolation(comment):
         numbers = [int(number) for number in numbers]
     except ValueError:
         numbers = []
-    replyString = scanNumbers(numbers, nhentaiKey, "")
+    replyString = scanNumbers(numbers, nhentaiKey, "continuous number")
     if replyString: return replyString
     
     # Loli tag bot criteria
