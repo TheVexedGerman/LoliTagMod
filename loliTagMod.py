@@ -19,9 +19,9 @@ hitomilaKey = 3
 commentsChecked = []
 doNotReplyList = ['Roboragi', 'WhyNotCollegeBoard']
 
-PARSED_SUBREDDIT = 'Animemes'
+PARSED_SUBREDDIT = 'Animemes+HentaiSource'
 # PARSED_SUBREDDIT = 'loli_tag_bot'
-REPORTING_SUBREDDIT = ['Animemes']
+REPORTING_SUBREDDIT = ['Animemes', 'HentaiSource']
 # REPORTING_SUBREDDIT = ['loli_tag_bot']
 # MODDING_SUBREDDIT = ['loli_tag_bot']
 MODDING_SUBREDDIT = []
@@ -210,9 +210,9 @@ def getKindOfViolation(currentCheck, key):
 
 
 def generateReportString(site, additionalInfo, kind="Violation", prepend=""):
-    replyString = "7.2 " + kind + " number: " + site + " " + additionalInfo
+    replyString = f"{kind} number: {site} {additionalInfo}"
     if prepend:
-        replyString = prepend + " " + replyString
+        replyString = f"{prepend} {replyString}"
     return replyString
 
 
