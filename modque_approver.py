@@ -19,14 +19,14 @@ ehentaiKey = 2
 hitomilaKey = 3
 
 
-# PARSED_SUBREDDIT = 'Animemes'
-PARSED_SUBREDDIT = 'loli_tag_bot'
+PARSED_SUBREDDIT = 'Animemes'
+# PARSED_SUBREDDIT = 'loli_tag_bot'
 
 def authenticate():
     print("Authenticating...")
     reddit = praw.Reddit(
-        # 'sachimod'
-        'lolitagmod'
+        'sachimod'
+        # 'lolitagmod'
         )
     print("Authenticated as {}".format(reddit.user.me()))
     return reddit
@@ -35,9 +35,9 @@ def authenticate():
 def main():
     global reddit
     reddit = authenticate()
-    run_bot()
-    # while True:
-    #     run_bot()
+    # run_bot()
+    while True:
+        run_bot()
 
 
 def run_bot():
@@ -50,6 +50,8 @@ def run_bot():
                 comment.mod.approve()
             else:
                 comment.mod.remove(spam=False)
+    print("Sleeping for 30 seconds...")
+    time.sleep(30)
 
 
 def check_for_violation(comment):
@@ -76,8 +78,14 @@ def check_for_violation(comment):
                 if len(processedData) > 1:
                     if processedData[-1]:
                         isRedacted = True
+                        break
         return True, isRedacted
     return False, isRedacted
 
 
-main()
+if __name__ == '__main__':
+    while True:
+        try:
+            main()
+        except Exception as e:
+            pass
