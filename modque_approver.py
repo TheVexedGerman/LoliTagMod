@@ -44,11 +44,14 @@ def run_bot():
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching modqueue...")
     for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
+        print(comment.body)
         has_numbers, has_redaction = check_for_violation(comment.body)
         if has_numbers:
             if not has_redaction:
+                print("Approving Comment")
                 comment.mod.approve()
             else:
+                print("Removing Comment")
                 comment.mod.remove(spam=False)
     print("Sleeping for 30 seconds...")
     time.sleep(30)
