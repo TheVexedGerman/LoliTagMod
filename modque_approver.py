@@ -20,6 +20,7 @@ hitomilaKey = 3
 
 
 PARSED_SUBREDDIT = 'Animemes'
+FLAIR_ID = "094ce764-898a-11e9-b1bf-0e66eeae092c"
 # PARSED_SUBREDDIT = 'loli_tag_bot'
 
 def authenticate():
@@ -53,6 +54,8 @@ def run_bot():
             else:
                 print("Removing Comment")
                 comment.mod.remove(spam=False)
+    print("Checking for improper spoilers")
+    check_for_improper_spoilers()
     print("Sleeping for 30 seconds...")
     time.sleep(30)
 
@@ -84,6 +87,18 @@ def check_for_violation(comment):
                         break
         return True, isRedacted
     return False, isRedacted
+
+
+def check_for_improper_spoilers():
+    for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=200):
+        if submission.spoiler:
+            # check title for spoiler formatting
+            match = re.search(r"\[.+?\]", submission.title)
+            if not match:
+                print(f"Removeing: {submission.title}")
+                submission.mod.remove()
+                # improperly marked spoiler flair
+                submission.flair.select(FLAIR_ID)
 
 
 if __name__ == '__main__':
