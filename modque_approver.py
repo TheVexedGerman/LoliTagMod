@@ -141,7 +141,7 @@ def make_dict(reports):
 
 
 def approve_old_reposts():
-    for reports in reddit.subreddit(PARSED_SUBREDDIT).mod.reports():
+    for reports in reddit.subreddit(PARSED_SUBREDDIT).mod.reports(only = 'submissions'):
         # Why can't I check if link flair exists without trying to get an exception?
         try:
             # check if there is a template ID (through AttributeError) and if the template ID matches the old repost one
