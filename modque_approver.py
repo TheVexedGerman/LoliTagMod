@@ -146,6 +146,7 @@ def approve_old_reposts():
         try:
             # check if there is a template ID (through AttributeError) and if the template ID matches the old repost one
             if reports.link_flair_template_id == "9a07b400-3c37-11e9-a73e-0e2a828fd580":
+                print(reports.title)
                 approve = True
                 report_dict = make_dict(reports.user_reports)
                 for report in reports.user_reports:
@@ -153,7 +154,8 @@ def approve_old_reposts():
                     if "repost" not in report[0].lower():
                         approve = False
                         break
-                if not approve:
+                if not approve and reports.id not in watched_id_set:
+                    print("closer check loop")
                     cursor.execute("SELECT reports_json FROM repost_report_check WHERE id = %s", [reports.id])
                     reference_dict = cursor.fetchone()
                     # Make sure an entry exits before assignment, otherwise create empty dict
@@ -170,11 +172,13 @@ def approve_old_reposts():
                             watched_id_set.add(reports.id)
                             watched_id_report_dict.update({reports.id:report_dict})
                             update_db(reports.id, report_dict)
+                            print("No approval")
                             approve = False
                             break
                         approve = True
                 # approve the post and go back to the beginning of the loop        
                 if approve:
+                    print("Approved")
                     reports.mod.approve()
                     update_db(reports.id, report_dict)
                     continue
