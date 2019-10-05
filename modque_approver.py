@@ -6,6 +6,7 @@ import re
 import datetime
 import json
 import psycopg2
+import traceback
 #imports the site wrappers for the sites from the nhentai bot
 import wrapper.nhentai as nhentai
 import wrapper.tsumino as tsumino
@@ -205,5 +206,6 @@ if __name__ == '__main__':
         try:
             main()
         except Exception as e:
-            print(e)
+            print(traceback.format_exc())
+            open("log.txt", 'a').write(f"{datetime.datetime.now().time()}:\n{traceback.format_exc()}\n")
             pass
