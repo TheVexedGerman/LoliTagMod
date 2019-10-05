@@ -186,7 +186,7 @@ def approve_old_reposts():
             pass
     # Check modlog for approvals of previously marked posts.
     if watched_id_set:
-        for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit = 50):
+        for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit = 200):
             if action.target_fullname[:2] == "t3":
                 if action.target_fullname[3:] in watched_id_set:
                     cursor.execute("SELECT timestamp FROM repost_report_check WHERE id = %s", [reports.id])
