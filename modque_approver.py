@@ -54,6 +54,9 @@ def run_bot():
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching modqueue...")
     for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
+        if comment.author.name == 'AnimemesBot':
+            comment.mod.approve()
+            continue
         print(comment.body)
         has_numbers, has_redaction = check_for_violation(comment.body)
         if has_numbers:
