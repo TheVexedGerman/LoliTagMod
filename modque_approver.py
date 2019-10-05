@@ -185,15 +185,16 @@ def approve_old_reposts():
         except AttributeError:
             pass
     # Check modlog for approvals of previously marked posts.
-    for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit = 200):
-        if action.target_fullname[:2] == "t3":
-            if action.target_fullname[3:] in watched_id_set:
-                cursor.execute("SELECT timestamp FROM repost_report_check WHERE id = %s", [reports.id])
-                time = cursor.fetchone()[0]
-                action_time = datetime.datetime.utcfromtimestamp(action.created_utc)
-                if time < action_time:
-                    watched_id_set.remove(action.target_fullname[3:])
-                    update_db(action.target_fullname[3:], watched_id_set.pop(action.target_fullname[3:]))
+    if watched_id_set:
+        for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit = 50):
+            if action.target_fullname[:2] == "t3":
+                if action.target_fullname[3:] in watched_id_set:
+                    cursor.execute("SELECT timestamp FROM repost_report_check WHERE id = %s", [reports.id])
+                    time = cursor.fetchone()[0]
+                    action_time = datetime.datetime.utcfromtimestamp(action.created_utc)
+                    if time < action_time:
+                        watched_id_set.remove(action.target_fullname[3:])
+                        update_db(action.target_fullname[3:], watched_id_set.pop(action.target_fullname[3:]))
 
 
 if __name__ == '__main__':
