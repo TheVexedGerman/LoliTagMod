@@ -193,7 +193,7 @@ def approve_old_reposts():
         for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit = 200):
             if action.target_fullname[:2] == "t3":
                 if action.target_fullname[3:] in watched_id_set:
-                    cursor.execute("SELECT timestamp FROM repost_report_check WHERE id = %s", [reports.id])
+                    cursor.execute("SELECT timestamp FROM repost_report_check WHERE id = %s", [action.target_fullname[3:]])
                     time = cursor.fetchone()[0]
                     action_time = datetime.datetime.utcfromtimestamp(action.created_utc)
                     if time < action_time:
