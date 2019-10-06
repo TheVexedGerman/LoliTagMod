@@ -13,7 +13,7 @@ import wrapper.tsumino as tsumino
 import wrapper.ehentai as ehentai
 import wrapper.hitomila as hitomila
 import wrapper.nHentaiTagBot as bot
-import postgres_credentials
+import postgres_credentials_modque
 
 
 nhentaiKey = 0
@@ -78,6 +78,12 @@ def run_bot():
 def check_for_violation(comment):
     print("checkforviolation being run")
     numbers_combi = bot.scanForURL(comment)
+    improper_nhentai_numbers = check_for_improper_urls(comment)
+    if numbers_combi and improper_nhentai_numbers:
+        for element in improper_nhentai_numbers:
+            numbers_combi[0].append(element)
+    elif not numbers_combi and improper_nhentai_numbers:
+        numbers_combi = [improper_nhentai_numbers, [], [], []]
     combination = []
     isRedacted = False
     if numbers_combi:
@@ -115,6 +121,13 @@ def check_for_improper_spoilers():
                 # improperly marked spoiler flair
                 submission.flair.select(FLAIR_ID)
 
+def check_for_improper_urls(comment):
+    improper_nhentai_numbers = re.findall(r'((:?www.)?nhentai.net\/g\/.*?)(\d{1,6})', comment)
+    try:
+        improper_nhentai_numbers = [int(number[2]) for number in improper_nhentai_numbers]
+    except ValueError:
+        improper_nhentai_numbers = []
+    return improper_nhentai_numbers
 
 def authenticate_db():
     db_conn = psycopg2.connect(
