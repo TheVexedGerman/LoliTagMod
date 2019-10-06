@@ -131,10 +131,10 @@ def check_for_improper_urls(comment):
 
 def authenticate_db():
     db_conn = psycopg2.connect(
-    host = postgres_credentials.HOST,
-    database = postgres_credentials.DATABASE,
-    user = postgres_credentials.USER,
-    password = postgres_credentials.PASSWORD
+    host = postgres_credentials_modque.HOST,
+    database = postgres_credentials_modque.DATABASE,
+    user = postgres_credentials_modque.USER,
+    password = postgres_credentials_modque.PASSWORD
     )   
 
     return db_conn, db_conn.cursor()
