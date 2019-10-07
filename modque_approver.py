@@ -33,12 +33,17 @@ def authenticate():
         # 'lolitagmod'
         )
     print("Authenticated as {}".format(reddit.user.me()))
-    return reddit
+    reddit2 = praw.Reddit(
+        'hentaimemesmod'
+        )
+    print("Authenticated as {}".format(reddit2.user.me()))
+    return reddit, reddit2
 
 
 def main():
     global reddit
-    reddit = authenticate()
+    global reddit2
+    reddit, reddit2 = authenticate()
     global cursor
     global db_conn
     db_conn, cursor = authenticate_db()
@@ -71,6 +76,17 @@ def run_bot():
     check_for_improper_spoilers()
     print("Checking for re-reported reposts")
     approve_old_reposts()
+    print("Checking hentaimemes queue comments")
+    for comment in reddit2.subreddit('hentaimemes').mod.modqueue(only='comments', limit=None):
+        print(comment.body)
+        has_numbers, has_redaction = check_for_violation(comment.body)
+        if has_numbers:
+            if not has_redaction:
+                print("Approving Comment")
+                comment.mod.approve()
+            else:
+                print("Removing Comment")
+                comment.mod.remove(spam=False)
     print("Sleeping for 30 seconds...")
     time.sleep(30)
 
