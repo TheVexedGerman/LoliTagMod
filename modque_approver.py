@@ -184,7 +184,7 @@ def approve_old_reposts():
                 report_dict = make_dict(reports.user_reports)
                 for report in reports.user_reports:
                     # if the report contains repost it can be ignored.
-                    if "repost" not in report[0].lower():
+                    if "repost" not in report[0].lower() and 'http' not in report[0].lower():
                         approve = False
                         break
                 if not approve and reports.id not in watched_id_set:
@@ -198,7 +198,7 @@ def approve_old_reposts():
                         reference_dict = {}
                     for entry in report_dict:
                         # ignore repost reports even if they have changed number
-                        if "repost" in entry.lower():
+                        if "repost" in entry.lower() and 'http' not in report[0].lower():
                             continue
                         # compare the entry to the stored one if they don't match set watch and break out of loop
                         if report_dict.get(entry) != reference_dict.get(entry):
