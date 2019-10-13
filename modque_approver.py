@@ -198,7 +198,7 @@ def approve_old_reposts():
                         reference_dict = {}
                     for entry in report_dict:
                         # ignore repost reports even if they have changed number
-                        if "repost" in entry.lower() and 'http' not in report[0].lower():
+                        if "repost" in entry.lower() and 'http' not in entry.lower():
                             continue
                         # compare the entry to the stored one if they don't match set watch and break out of loop
                         if report_dict.get(entry) != reference_dict.get(entry):
