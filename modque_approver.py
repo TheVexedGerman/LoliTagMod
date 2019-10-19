@@ -87,6 +87,8 @@ def run_bot():
             else:
                 print("Removing Comment")
                 comment.mod.remove(spam=False)
+    print("Grabbing bans")
+    grab_bans()
     print("Sleeping for 30 seconds...")
     time.sleep(30)
 
@@ -127,7 +129,7 @@ def check_for_violation(comment):
 
 
 def check_for_improper_spoilers():
-    for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=200):
+    for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
         if submission.spoiler:
             # check title for spoiler formatting
             match = re.search(r"\[.+?\]", submission.title)
@@ -228,6 +230,34 @@ def approve_old_reposts():
                     if time < action_time:
                         watched_id_set.remove(action.target_fullname[3:])
                         update_db(action.target_fullname[3:], watched_id_set.pop(action.target_fullname[3:]))
+
+
+def get_old_ids(cursor):
+    cursor.execute("select id from bans")
+    already_scanned = cursor.fetchall()
+    id_set = set()
+    for entry in already_scanned:
+        id_set.update(entry)
+    return id_set
+
+
+def update_ban_db(ban):
+    cursor.execute("SELECT * FROM bans WHERE id = %s", [ban.id])
+    entry_exists = cursor.fetchone()
+    if entry_exists:
+        return
+    else:
+        cursor.execute("INSERT INTO bans (id, target_author, created_utc, description, details, mod, sent_to_discord) VALUES (%s, %s, %s, %s, %s, %s, %s)", (ban.id, ban.target_author, convert_time(ban.created_utc), ban.description, ban.details, ban.mod.name, False))
+    db_conn.commit()
+
+def convert_time(time):
+    if time:
+        return datetime.datetime.utcfromtimestamp(time)
+    return None
+
+def grab_bans():
+    for entry in reddit.subreddit('animemes').mod.log(action='banuser', limit=100):
+        update_ban_db(entry)
 
 
 if __name__ == '__main__':
