@@ -87,8 +87,6 @@ def run_bot():
             else:
                 print("Removing Comment")
                 comment.mod.remove(spam=False)
-    print("Grabbing bans")
-    grab_bans()
     
     print("Grabbing Modlog")
     grab_modlog()
@@ -253,23 +251,11 @@ def grab_modlog():
         cursor.execute("INSERT INTO modlog (action, created_utc, description, details, id, mod, mod_id36, sr_id36, subreddit, subreddit_name_prefixed, target_author, target_body, target_fullname, target_permalink, target_title) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (action.action, convert_time(action.created_utc), action.description, action.details, action.id, str(action.mod), action.mod_id36, action.sr_id36, action.subreddit, action.subreddit_name_prefixed, str(action.target_author), action.target_body, action.target_fullname, action.target_permalink, action.target_title))
         db_conn.commit()
 
-def update_ban_db(ban):
-    cursor.execute("SELECT * FROM bans WHERE id = %s", [ban.id])
-    entry_exists = cursor.fetchone()
-    if entry_exists:
-        return
-    else:
-        cursor.execute("INSERT INTO bans (id, target_author, created_utc, description, details, mod, sent_to_discord) VALUES (%s, %s, %s, %s, %s, %s, %s)", (ban.id, ban.target_author, convert_time(ban.created_utc), ban.description, ban.details, ban.mod.name, False))
-    db_conn.commit()
 
 def convert_time(time):
     if time:
         return datetime.datetime.utcfromtimestamp(time)
     return None
-
-def grab_bans():
-    for entry in reddit.subreddit('animemes').mod.log(action='banuser', limit=100):
-        update_ban_db(entry)
 
 
 if __name__ == '__main__':
