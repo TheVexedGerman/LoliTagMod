@@ -230,7 +230,7 @@ def approve_old_reposts():
                     action_time = datetime.datetime.utcfromtimestamp(action.created_utc)
                     if time < action_time:
                         watched_id_set.remove(action.target_fullname[3:])
-                        update_db(action.target_fullname[3:], watched_id_set.pop(action.target_fullname[3:]))
+                        update_db(action.target_fullname[3:], watched_id_report_dict.pop(action.target_fullname[3:]))
 
 
 def get_old_ids(cursor):
