@@ -251,11 +251,13 @@ def approve_weekend_reaction_meme_reposts(reports):
     if reports.user_reports:
         return
     for report in reports.mod_reports:
+        print("found suspect")
         if 'Possible Repost: check comments' in report[0]:
             for comment in reports.comments.list():
                 try:
                     if comment.author.name.lower() == 'animemesbot':
-                        posts = re.findall(r'(?=https:\/\/redd.it\/).{1,6}', comment.body)
+                        posts = re.findall(r'(?<=https:\/\/redd.it\/).{1,6}', comment.body)
+                        print(posts)
                         if len(posts) == 1:
                             try:
                                 if reddit.submission(id=posts[0]).link_flair_template_id == '1dda8d90-501e-11e8-98b7-0e6fcedead42':
