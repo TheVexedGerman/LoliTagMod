@@ -294,7 +294,7 @@ def approve_weekend_reaction_memes(reports):
         else:
             reference_dict = {}
         for entry in report_dict:
-            if "Rule 3: Weekday Reaction Meme" in entry:
+            if entry and "Rule 3: Weekday Reaction Meme" in entry:
                 continue
             # compare the entry to the stored one if they don't match set watch and break out of loop
             if report_dict.get(entry) != reference_dict.get(entry):
