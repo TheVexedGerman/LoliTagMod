@@ -279,7 +279,7 @@ def approve_weekend_reaction_memes(reports):
         return
     for report in reports.user_reports:
         # check if reaction meme is in the report
-        if "Rule 3: Weekday Reaction Meme" not in report[0]:
+        if report[0] and "Rule 3: Weekday Reaction Meme" not in report[0]:
             approve = False
         else:
             print("is reaction")
