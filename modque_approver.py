@@ -252,7 +252,7 @@ def approve_weekend_reaction_meme_reposts(reports):
         return
     for report in reports.mod_reports:
         if 'Possible Repost: check comments' in report[0]:
-            for comment in reports.comments().list():
+            for comment in reports.comments.list():
                 try:
                     if comment.author.name.lower() == 'animemesbot':
                         posts = re.findall(r'(?=https:\/\/redd.it\/).{1,6}', comment.body)
