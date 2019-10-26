@@ -273,6 +273,8 @@ def approve_weekend_reaction_memes(reports):
     approve = True
     is_reaction = False
     report_dict = make_dict(reports.user_reports)
+    if convert_time(reports.created_utc).weekday() < 5:
+        return
     for report in reports.user_reports:
         # check if reaction meme is in the report
         if "Rule 3: Weekday Reaction Meme" not in report[0]:
@@ -303,9 +305,8 @@ def approve_weekend_reaction_memes(reports):
             approve = True
         # approve the post and go back to the beginning of the loop        
     if approve:
-        if convert_time(reports.created_utc).weekday() < 5:
-            reports.mod.approve()
-            update_db(reports.id, report_dict)
+        reports.mod.approve()
+        update_db(reports.id, report_dict)
 
 
 def grab_modlog():
