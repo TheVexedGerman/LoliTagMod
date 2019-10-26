@@ -178,6 +178,9 @@ def make_dict(reports):
 
 def approve_old_reposts():
     for reports in reddit.subreddit(PARSED_SUBREDDIT).mod.reports(only = 'submissions'):
+        if datetime.datetime.now().weekday() > 4:
+            approve_weekend_reaction_meme_reposts(reports)
+        approve_weekend_reaction_memes(reports)
         # Why can't I check if link flair exists without trying to get an exception?
         try:
             # check if there is a template ID (through AttributeError) and if the template ID matches the old repost one
@@ -187,7 +190,7 @@ def approve_old_reposts():
                 report_dict = make_dict(reports.user_reports)
                 for report in reports.user_reports:
                     # if the report contains repost it can be ignored.
-                    if "repost" not in report[0].lower() and 'http' not in report[0].lower():
+                    if "repost" not in report[0].lower():
                         approve = False
                         break
                 if not approve and reports.id not in watched_id_set:
@@ -233,13 +236,71 @@ def approve_old_reposts():
                         update_db(action.target_fullname[3:], watched_id_report_dict.pop(action.target_fullname[3:]))
 
 
-def get_old_ids(cursor):
-    cursor.execute("select id from bans")
-    already_scanned = cursor.fetchall()
-    id_set = set()
-    for entry in already_scanned:
-        id_set.update(entry)
-    return id_set
+# def get_old_ids(cursor):
+#     cursor.execute("select id from bans")
+#     already_scanned = cursor.fetchall()
+#     id_set = set()
+#     for entry in already_scanned:
+#         id_set.update(entry)
+#     return id_set
+
+
+def approve_weekend_reaction_meme_reposts(reports):
+    if not reports.mod_reports:
+        return
+    if reports.user_reports:
+        return
+    for report in reports.mod_reports:
+        if 'Possible Repost: check comments' in report[0]:
+            for comment in reports.comments():
+                if comment.author.name.lower() == 'animemesbot':
+                    posts = re.findall(r'(?=https:\/\/redd.it\/).{1,6}', comment.body)
+                    if len(posts) == 1:
+                        try:
+                            if reddit.submission(id=posts[0]).link_flair_template_id == '1dda8d90-501e-11e8-98b7-0e6fcedead42':
+                               reports.mod.approve()
+                        except AttributeError:
+                            return
+
+
+def approve_weekend_reaction_memes(reports):
+    print(reports.title)
+    approve = True
+    is_reaction = False
+    report_dict = make_dict(reports.user_reports)
+    for report in reports.user_reports:
+        # check if reaction meme is in the report
+        if "Rule 3: Weekday Reaction Meme" not in report[0]:
+            approve = False
+        else:
+            print("is reaction")
+            is_reaction = True
+    if is_reaction and not approve and reports.id not in watched_id_set:
+        print("closer check loop reaction meme")
+        cursor.execute("SELECT reports_json FROM repost_report_check WHERE id = %s", [reports.id])
+        reference_dict = cursor.fetchone()
+        # Make sure an entry exits before assignment, otherwise create empty dict
+        if reference_dict:
+            reference_dict = reference_dict[0]
+        else:
+            reference_dict = {}
+        for entry in report_dict:
+            if "Rule 3: Weekday Reaction Meme" in entry:
+                continue
+            # compare the entry to the stored one if they don't match set watch and break out of loop
+            if report_dict.get(entry) != reference_dict.get(entry):
+                watched_id_set.add(reports.id)
+                watched_id_report_dict.update({reports.id:report_dict})
+                update_db(reports.id, report_dict)
+                print("No approval")
+                approve = False
+                continue
+            approve = True
+        # approve the post and go back to the beginning of the loop        
+    if approve:
+        if convert_time(reports.created_utc).weekday() < 5:
+            reports.mod.approve()
+            update_db(reports.id, report_dict)
 
 
 def grab_modlog():
