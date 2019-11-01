@@ -90,6 +90,8 @@ def run_bot():
     
     print("Grabbing Modlog")
     grab_modlog()
+    print("Banning for reposts")
+    ban_for_reposts()
     print("Sleeping for 30 seconds...")
     time.sleep(30)
 
@@ -326,6 +328,38 @@ def convert_time(time):
         return datetime.datetime.utcfromtimestamp(time)
     return None
 
+def ban_for_reposts():
+    # Grab flair edits from modlog
+    cursor.execute("SELECT id, target_fullname FROM modlog WHERE action = 'editflair' and ban_processing = false ORDER BY created_utc DESC LIMIT 100")
+    edit_flair_list = cursor.fetchall()
+    check_ids = []
+    # add all the fullnames into a list
+    for edited_flair in edit_flair_list:
+        if edited_flair[1]:
+            check_ids.append(edited_flair[1])
+    # Fetch them all from reddit
+    for removal_suspect in reddit.info(fullnames=check_ids):
+        # check if they have the right flair
+        try:
+            if removal_suspect.link_flair_template_id:
+                pass
+        except AttributeError:
+            continue
+        if removal_suspect.link_flair_template_id == 'e186588a-fcc7-11e9-8108-0e38adec5b54':
+            # check if they have actually been removed
+            cursor.execute("SELECT id, action, target_author FROM modlog WHERE target_fullname = %s AND NOT action = 'editflair' ORDER BY created_utc DESC", (removal_suspect.name,))
+            current_state = cursor.fetchone()
+            if current_state[1] == 'removelink':
+                # ban the user
+                ban_user(current_state[2])
+                print(f"User: {current_state[2]} banned")
+    for entry in edit_flair_list:
+        cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
+    db_conn.commit()
+
+
+def ban_user(user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone needs to have the "No Repost" part of "No Repost November" [hammered into their skull](Sachi image). See you in three days.', duration = 3, note = "Automated ban for reposting a meme"):
+    reddit.subreddit('animemes').banned.add(user, ban_reason=ban_reason, ban_message=ban_message, duration=duration, note=note)
 
 if __name__ == '__main__':
     while True:
