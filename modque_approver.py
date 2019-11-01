@@ -351,7 +351,7 @@ def ban_for_reposts():
             current_state = cursor.fetchone()
             if current_state[1] == 'removelink':
                 # ban the user
-                ban_user(current_state[2])
+                ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
                 print(f"User: {current_state[2]} banned")
     for entry in edit_flair_list:
         cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
