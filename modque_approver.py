@@ -338,24 +338,25 @@ def ban_for_reposts():
         if edited_flair[1]:
             check_ids.append(edited_flair[1])
     # Fetch them all from reddit
-    for removal_suspect in reddit.info(fullnames=check_ids):
-        # check if they have the right flair
-        try:
-            if removal_suspect.link_flair_template_id:
-                pass
-        except AttributeError:
-            continue
-        if removal_suspect.link_flair_template_id == 'e186588a-fcc7-11e9-8108-0e38adec5b54':
-            # check if they have actually been removed
-            cursor.execute("SELECT id, action, target_author FROM modlog WHERE target_fullname = %s AND NOT action = 'editflair' ORDER BY created_utc DESC", (removal_suspect.name,))
-            current_state = cursor.fetchone()
-            if current_state[1] == 'removelink':
-                # ban the user
-                ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
-                print(f"User: {current_state[2]} banned")
-    for entry in edit_flair_list:
-        cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
-    db_conn.commit()
+    if check_ids:
+        for removal_suspect in reddit.info(fullnames=check_ids):
+            # check if they have the right flair
+            try:
+                if removal_suspect.link_flair_template_id:
+                    pass
+            except AttributeError:
+                continue
+            if removal_suspect.link_flair_template_id == 'e186588a-fcc7-11e9-8108-0e38adec5b54':
+                # check if they have actually been removed
+                cursor.execute("SELECT id, action, target_author FROM modlog WHERE target_fullname = %s AND NOT action = 'editflair' ORDER BY created_utc DESC", (removal_suspect.name,))
+                current_state = cursor.fetchone()
+                if current_state[1] == 'removelink':
+                    # ban the user
+                    ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
+                    print(f"User: {current_state[2]} banned")
+        for entry in edit_flair_list:
+            cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
+        db_conn.commit()
 
 
 def ban_user(user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone needs to have the "No Repost" part of "No Repost November" [hammered into their skull](https://i.imgur.com/4VsscZB.png). See you in three days.', duration = 3, note = "Automated ban for reposting a meme"):
