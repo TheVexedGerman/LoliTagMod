@@ -350,7 +350,7 @@ def ban_for_reposts():
                 # check if they have actually been removed
                 cursor.execute("SELECT id, action, target_author FROM modlog WHERE target_fullname = %s AND NOT action = 'editflair' ORDER BY created_utc DESC", (removal_suspect.name,))
                 current_state = cursor.fetchone()
-                if current_state[1] and current_state[1] == 'removelink':
+                if current_state and current_state[1] == 'removelink':
                     # ban the user
                     ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
                     print(f"User: {current_state[2]} banned")
