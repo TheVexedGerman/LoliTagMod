@@ -352,14 +352,24 @@ def ban_for_reposts():
                 current_state = cursor.fetchone()
                 if current_state and current_state[1] == 'removelink':
                     # ban the user
-                    ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
-                    print(f"User: {current_state[2]} banned")
+                    cursor.execute("SELECT id FROM modlog WHERE target_author = %s AND mod = 'SachiMod' AND action = 'banuser' ORDER BY created_utc DESC", (current_state[2],))
+                    previous_violations = cursor.fetchall()
+                    if previous_violations:
+                        if len(previous_violations) == 2:
+                            ban_user(current_state[2], duration=7, note=f"2nd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Looks like the first ban did not drive the "No Repost" part of "No Repost November" home. Maybe this will. See you in a week.')
+                            print(f"User: {current_state[2]} banned for the 2nd time")
+                        elif len(previous_violations) == 3:
+                            ban_user(current_state[2], duration=21, note=f"3rd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Since the previous two bans did not manage to explain that we really mean it with "No Reposts" during "No Repost November", you can just chill until December.')
+                            print(f"User: {current_state[2]} banned for the 3rd time")
+                    else:
+                        ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
+                        print(f"User: {current_state[2]} banned")
         for entry in edit_flair_list:
             cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
         db_conn.commit()
 
 
-def ban_user(user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone needs to have the "No Repost" part of "No Repost November" [hammered into their skull](https://i.imgur.com/4VsscZB.png). See you in three days.', duration = 3, note = "Automated ban for reposting a meme"):
+def ban_user(user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone did not understand the "No Repost" part of "No Repost November" and should have some sense [smacked into them](https://i.imgur.com/4VsscZB.png). See you in three days', duration = 3, note = "Automated ban for reposting a meme"):
     reddit.subreddit('animemes').banned.add(user, ban_reason=ban_reason, ban_message=ban_message, duration=duration, note=note)
 
 if __name__ == '__main__':
