@@ -133,6 +133,8 @@ def check_for_violation(comment):
 
 def check_for_improper_spoilers():
     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
+        if '[' in submission.title and ']' in submission.title and not submission.spoiler:
+            submission.report('Possible spoiler format in title, no tagging')
         if submission.spoiler:
             # check title for spoiler formatting
             match = re.search(r"\[.+?\]", submission.title)
