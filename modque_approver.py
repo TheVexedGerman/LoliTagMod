@@ -133,8 +133,10 @@ def check_for_violation(comment):
 
 def check_for_improper_spoilers():
     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
-        if '[' in submission.title and ']' in submission.title and not submission.spoiler:
+        # check for spoiler formatted title but no spoiler tag
+        if '[oc]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
             submission.report('Possible spoiler format in title, no tagging')
+        # check for spoiler tag byt not properly formatted title
         if submission.spoiler:
             # check title for spoiler formatting
             match = re.search(r"\[.+?\]", submission.title)
@@ -238,15 +240,6 @@ def approve_old_reposts():
                     if time < action_time:
                         watched_id_set.remove(action.target_fullname[3:])
                         update_db(action.target_fullname[3:], watched_id_report_dict.pop(action.target_fullname[3:]))
-
-
-# def get_old_ids(cursor):
-#     cursor.execute("select id from bans")
-#     already_scanned = cursor.fetchall()
-#     id_set = set()
-#     for entry in already_scanned:
-#         id_set.update(entry)
-#     return id_set
 
 
 def approve_weekend_reaction_meme_reposts(reports):
