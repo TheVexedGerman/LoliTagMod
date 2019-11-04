@@ -364,7 +364,7 @@ def ban_for_reposts():
         db_conn.commit()
 
 
-def ban_user(user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone did not understand the "No Repost" part of "No Repost November" and should have some sense [smacked into them](https://i.imgur.com/4VsscZB.png). See you in three days', duration = 3, note = "Automated ban for reposting a meme"):
+def ban_user(user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone did not understand the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) and should have some sense [smacked into them](https://i.imgur.com/4VsscZB.png). See you in three days', duration = 3, note = "Automated ban for reposting a meme"):
     reddit.subreddit('animemes').banned.add(user, ban_reason=ban_reason, ban_message=ban_message, duration=duration, note=note)
 
 if __name__ == '__main__':
