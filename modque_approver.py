@@ -134,7 +134,7 @@ def check_for_violation(comment):
 def check_for_improper_spoilers():
     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
         # check for spoiler formatted title but no spoiler tag
-        if '[oc]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
+        if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
             submission.report('Possible spoiler format in title, no tagging')
         # check for spoiler tag byt not properly formatted title
         if submission.spoiler:
@@ -350,10 +350,10 @@ def ban_for_reposts():
                     cursor.execute("SELECT id FROM modlog WHERE target_author = %s AND mod = 'SachiMod' AND action = 'banuser' ORDER BY created_utc DESC", (current_state[2],))
                     previous_violations = cursor.fetchall()
                     if previous_violations:
-                        if len(previous_violations) == 2:
+                        if len(previous_violations) == 1:
                             ban_user(current_state[2], duration=7, note=f"2nd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Looks like the first ban did not drive the "No Repost" part of "No Repost November" home. Maybe this will. See you in a week.')
                             print(f"User: {current_state[2]} banned for the 2nd time")
-                        elif len(previous_violations) == 3:
+                        elif len(previous_violations) == 2:
                             ban_user(current_state[2], duration=21, note=f"3rd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Since the previous two bans did not manage to explain that we really mean it with "No Reposts" during "No Repost November", you can just chill until December.')
                             print(f"User: {current_state[2]} banned for the 3rd time")
                     else:
