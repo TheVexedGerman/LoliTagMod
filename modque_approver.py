@@ -347,13 +347,13 @@ def ban_for_reposts():
                 current_state = cursor.fetchone()
                 if current_state and current_state[1] == 'removelink':
                     # ban the user
-                    cursor.execute("SELECT id FROM modlog WHERE target_author = %s AND mod = 'SachiMod' AND action = 'banuser' ORDER BY created_utc DESC", (current_state[2],))
+                    cursor.execute("SELECT id, created_utc FROM modlog WHERE target_author = %s AND mod = 'SachiMod' AND action = 'banuser' ORDER BY created_utc DESC", (current_state[2],))
                     previous_violations = cursor.fetchall()
                     if previous_violations:
-                        if len(previous_violations) == 1:
+                        if len(previous_violations) == 1 and (datetime.datetime.now() - previous_violations[0][1] > datetime.timedelta(days=3)):
                             ban_user(current_state[2], duration=7, note=f"2nd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Looks like the first ban did not drive the "No Repost" part of "No Repost November" home. Maybe this will. See you in a week.')
                             print(f"User: {current_state[2]} banned for the 2nd time")
-                        elif len(previous_violations) == 2:
+                        elif len(previous_violations) == 2 and (datetime.datetime.now() - previous_violations[0][1] > datetime.timedelta(days=7)):
                             ban_user(current_state[2], duration=21, note=f"3rd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Since the previous two bans did not manage to explain that we really mean it with "No Reposts" during "No Repost November", you can just chill until December.')
                             print(f"User: {current_state[2]} banned for the 3rd time")
                     else:
