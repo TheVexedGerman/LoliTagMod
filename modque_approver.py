@@ -359,6 +359,22 @@ def ban_for_reposts():
                     else:
                         ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
                         print(f"User: {current_state[2]} banned")
+            elif removal_suspect.link_flair_template_id == '971f97d6-0553-11ea-b4c7-0e2542370189':
+                cursor.execute("SELECT mod FROM modlog WHERE target_fullname = %s AND action = 'editflair' ORDER BY created_utc DESC", (removal_suspect.name,))
+                mod = cursor.fetchone()
+                cursor.execute("SELECT * FROM saves WHERE mod = %s", (mod[0],))
+                entry_exists = cursor.fetchone()
+                if entry_exists:
+                    counter = 0
+                    for entry in entry_exists[2:]:
+                        if entry != None:
+                            counter += 1
+                    if counter > 5:
+                        continue
+                    # totally not sanitzed, but I don't actually expect any SQL injection from the data input
+                    cursor.execute(f"UPDATE saves SET id_{counter} = '{removal_suspect.id}' WHERE mod = '{mod[0]}'")
+                else:
+                    cursor.execute("INSERT INTO saves (mod, id_0) VALUES (%s, %s)", (mod[0], removal_suspect.id))
         for entry in edit_flair_list:
             cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
         db_conn.commit()
