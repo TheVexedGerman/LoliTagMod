@@ -369,7 +369,7 @@ def ban_for_reposts():
                     for entry in entry_exists[2:]:
                         if entry != None:
                             counter += 1
-                    if counter > 5:
+                    if counter > 10:
                         continue
                     # totally not sanitzed, but I don't actually expect any SQL injection from the data input
                     cursor.execute(f"UPDATE saves SET id_{counter} = '{removal_suspect.id}' WHERE mod = '{mod[0]}'")
