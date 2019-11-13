@@ -375,6 +375,11 @@ def ban_for_reposts():
                     cursor.execute(f"UPDATE saves SET id_{counter} = '{removal_suspect.id}' WHERE mod = '{mod[0]}'")
                 else:
                     cursor.execute("INSERT INTO saves (mod, id_0) VALUES (%s, %s)", (mod[0], removal_suspect.id))
+            elif removal_suspect.link_flair_template_id == '21e8170e-04fe-11ea-944d-0ee316f9f307':
+                cursor.execute("SELECT id, created_utc, mod FROM modlog WHERE target_fullname = %s AND action = 'removelink' ORDER BY created_utc DESC", (removal_suspect.name,))
+                log_entry = cursor.fetchone()
+                if log_entry:
+                    cursor.execute("INSERT INTO event_removals (id, created_utc, mod, target_id) VALUES (%s, %s, %s, %s)", (log_entry[0], log_entry[1], log_entry[2], removal_suspect.id))
         for entry in edit_flair_list:
             cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
         db_conn.commit()
