@@ -391,41 +391,11 @@ def ban_for_reposts():
 def ban_user(user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone did not understand the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) and should have some sense [smacked into them](https://i.imgur.com/4VsscZB.png). See you in three days\n\nMake sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.', duration = 3, note = "Automated ban for reposting a meme"):
     reddit.subreddit('animemes').banned.add(user, ban_reason=ban_reason, ban_message=ban_message, duration=duration, note=note)
 
-# if __name__ == '__main__':
-#     while True:
-#         try:
-#             main()
-#         except Exception as e:
-#             print(traceback.format_exc())
-#             open("log.txt", 'a').write(f"{datetime.datetime.now().time()}:\n{traceback.format_exc()}\n")
-#             pass
-
-reddit, reddit2 = authenticate()
-db_conn, cursor = authenticate_db()
-
-cursor.execute("SELECT id, target_fullname FROM modlog WHERE action = 'editflair' and created_utc > '2019-11-12 19:31:14' ORDER BY created_utc DESC")
-edit_flair_list = True
-while edit_flair_list:
-    edit_flair_list = cursor.fetchmany(100)
-    check_ids = []
-    # add all the fullnames into a list
-    for edited_flair in edit_flair_list:
-        if edited_flair[1]:
-            check_ids.append(edited_flair[1])
-    # Fetch them all from reddit
-    if check_ids:
-        for removal_suspect in reddit.info(fullnames=check_ids):
-            try:
-                if removal_suspect.link_flair_template_id:
-                    pass
-            except AttributeError:
-                continue
-            if removal_suspect.link_flair_template_id == '21e8170e-04fe-11ea-944d-0ee316f9f307':
-                cursor.execute("SELECT id, created_utc, mod FROM modlog WHERE target_fullname = %s AND action = 'removelink' ORDER BY created_utc DESC", (removal_suspect.name,))
-                log_entry = cursor.fetchone()
-                if log_entry:
-                    cursor.execute("SELECT id FROM event_removals WHERE id = %s", (log_entry[0],))
-                    already_exists = cursor.fetchone()
-                    if not already_exists:
-                        cursor.execute("INSERT INTO event_removals (id, created_utc, mod, target_id) VALUES (%s, %s, %s, %s)", (log_entry[0], log_entry[1], log_entry[2], removal_suspect.id))
-            db_conn.commit()
+if __name__ == '__main__':
+    while True:
+        try:
+            main()
+        except Exception as e:
+            print(traceback.format_exc())
+            open("log.txt", 'a').write(f"{datetime.datetime.now().time()}:\n{traceback.format_exc()}\n")
+            pass
