@@ -337,6 +337,9 @@ def ban_for_reposts():
     # Fetch them all from reddit
     if check_ids:
         for removal_suspect in reddit.info(fullnames=check_ids):
+            # check that it was posted in november
+            if convert_time(removal_suspect.created_utc) > datetime.datetime(2019, 12, 1):
+                continue
             # check if they have the right flair
             try:
                 if removal_suspect.link_flair_template_id:
@@ -361,30 +364,6 @@ def ban_for_reposts():
                     else:
                         ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
                         print(f"User: {current_state[2]} banned")
-            # elif removal_suspect.link_flair_template_id == '971f97d6-0553-11ea-b4c7-0e2542370189':
-            #     cursor.execute("SELECT mod FROM modlog WHERE target_fullname = %s AND action = 'editflair' ORDER BY created_utc DESC", (removal_suspect.name,))
-            #     mod = cursor.fetchone()
-            #     cursor.execute("SELECT * FROM saves WHERE mod = %s", (mod[0],))
-            #     entry_exists = cursor.fetchone()
-            #     if entry_exists:
-            #         counter = 0
-            #         for entry in entry_exists[2:]:
-            #             if entry != None:
-            #                 counter += 1
-            #         if counter > 10:
-            #             continue
-            #         # totally not sanitzed, but I don't actually expect any SQL injection from the data input
-            #         cursor.execute(f"UPDATE saves SET id_{counter} = '{removal_suspect.id}' WHERE mod = '{mod[0]}'")
-            #     else:
-            #         cursor.execute("INSERT INTO saves (mod, id_0) VALUES (%s, %s)", (mod[0], removal_suspect.id))
-            # elif removal_suspect.link_flair_template_id == '21e8170e-04fe-11ea-944d-0ee316f9f307':
-            #     cursor.execute("SELECT id, created_utc, mod FROM modlog WHERE target_fullname = %s AND action = 'removelink' ORDER BY created_utc DESC", (removal_suspect.name,))
-            #     log_entry = cursor.fetchone()
-            #     if log_entry:
-            #         cursor.execute("SELECT id FROM event_removals WHERE id = %s", (log_entry[0],))
-            #         already_exists = cursor.fetchone()
-            #         if not already_exists:
-            #             cursor.execute("INSERT INTO event_removals (id, created_utc, mod, target_id) VALUES (%s, %s, %s, %s)", (log_entry[0], log_entry[1], log_entry[2], removal_suspect.id))
         for entry in edit_flair_list:
             cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
         db_conn.commit()
@@ -399,8 +378,6 @@ def modmail_fetcher():
         cursor.execute("SELECT id, replies FROM modmail WHERE id = %s", [message.id])
         replies = [reply.id for reply in message.replies]
         exists = cursor.fetchone()
-        print(exists)
-        print(replies)
         if exists and exists[1] == message.replies:
             break
         cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, replies, subject, author, body) VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET replies = EXCLUDED.replies, sent_to_discord = false", (message.id, convert_time(message.created_utc), message.first_message_name, replies, message.subject, str(message.author), message.body))
