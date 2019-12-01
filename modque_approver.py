@@ -46,7 +46,9 @@ def main():
     reddit, reddit2 = authenticate()
     global cursor
     global db_conn
-    db_conn, cursor = authenticate_db()
+    global cursor2
+    global db_conn2
+    db_conn, cursor, db_conn2, cursor2 = authenticate_db()
     global watched_id_set
     watched_id_set = set()
     global watched_id_report_dict
@@ -162,9 +164,15 @@ def authenticate_db():
     database = postgres_credentials_modque.DATABASE,
     user = postgres_credentials_modque.USER,
     password = postgres_credentials_modque.PASSWORD
+    )
+    db_conn2 = psycopg2.connect(
+    host = postgres_credentials_modque.HOST,
+    database = 'hentaimemes',
+    user = postgres_credentials_modque.USER,
+    password = postgres_credentials_modque.PASSWORD
     )   
 
-    return db_conn, db_conn.cursor()
+    return db_conn, db_conn.cursor(), db_conn2, db_conn2.cursor()
 
 
 def update_db(post_id, reports_dict):
@@ -318,6 +326,13 @@ def grab_modlog():
             break
         cursor.execute("INSERT INTO modlog (action, created_utc, description, details, id, mod, mod_id36, sr_id36, subreddit, subreddit_name_prefixed, target_author, target_body, target_fullname, target_permalink, target_title) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (action.action, convert_time(action.created_utc), action.description, action.details, action.id, str(action.mod), action.mod_id36, action.sr_id36, action.subreddit, action.subreddit_name_prefixed, str(action.target_author), action.target_body, action.target_fullname, action.target_permalink, action.target_title))
         db_conn.commit()
+    for action in reddit2.subreddit("hentaimemes").mod.log(limit=None):
+        cursor2.execute("SELECT * FROM modlog WHERE id = %s", [action.id])
+        exists = cursor2.fetchone()
+        if exists:
+            break
+        cursor2.execute("INSERT INTO modlog (action, created_utc, description, details, id, mod, mod_id36, sr_id36, subreddit, subreddit_name_prefixed, target_author, target_body, target_fullname, target_permalink, target_title) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (action.action, convert_time(action.created_utc), action.description, action.details, action.id, str(action.mod), action.mod_id36, action.sr_id36, action.subreddit, action.subreddit_name_prefixed, str(action.target_author), action.target_body, action.target_fullname, action.target_permalink, action.target_title))
+        db_conn2.commit()
 
 
 def convert_time(time):
