@@ -259,7 +259,7 @@ def approve_weekend_reaction_meme_reposts(reports):
         return
     for report in reports.mod_reports:
         print("found suspect")
-        if 'Possible Repost: check comments' in report[0]:
+        if 'Possible Repost' in report[0]:
             for comment in reports.comments.list():
                 try:
                     if comment.author.name.lower() == 'animemesbot':
