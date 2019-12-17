@@ -149,6 +149,16 @@ def check_for_improper_spoilers():
                 submission.mod.remove()
                 # improperly marked spoiler flair
                 submission.flair.select(FLAIR_ID)
+        # remove low resolution images
+        if submission.preview:
+            try:
+                if submission.preview.get('images'):
+                    res = submission.preview['images'][0]
+                    if res['height'] * res['width'] < 160000:
+                        submission.mod.remove()
+                        submission.flair.select('c87c2ac6-1dd4-11ea-9a24-0ea0ae2c9561', text="Rule 10: Post Quality - Low Res")
+            except:
+                print(traceback.format_exc())
 
 def check_for_improper_urls(comment):
     improper_nhentai_numbers = re.findall(r'((:?www.)?nhentai.net\/g\/.*?)(\d{1,6})', comment)
