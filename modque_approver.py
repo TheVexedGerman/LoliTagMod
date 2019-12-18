@@ -179,7 +179,7 @@ def check_for_improper_spoilers(new_post_list):
         offset = get_offset(current_new_post_list, new_post_list)
         for i, entry in enumerate(new_post_list):
             # exit if the end of new list has been reached.
-            if i + offset > len(current_new_post_list):
+            if i + offset >= len(current_new_post_list):
                 break
             else:
                 # check if the ids are identical
