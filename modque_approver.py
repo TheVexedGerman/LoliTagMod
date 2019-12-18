@@ -76,6 +76,7 @@ def run_bot(new_post_list):
                 print("Removing Comment")
                 comment.mod.remove(spam=False)
     print("Checking for improper spoilers")
+    global new_post_list
     new_post_list = check_for_improper_spoilers(new_post_list)
     print("Checking for re-reported reposts")
     approve_old_reposts()
@@ -172,6 +173,7 @@ def check_for_improper_spoilers(new_post_list):
         current_new_post_list.append(submission.id)
 
     # make sure there is a previous list
+    print(new_post_list)
     if new_post_list:
         # determine the offset between the old and the new list
         offset = get_offset(current_new_post_list, new_post_list)
