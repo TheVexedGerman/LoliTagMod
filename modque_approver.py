@@ -404,33 +404,34 @@ def ban_for_reposts():
     # Fetch them all from reddit
     if check_ids:
         for removal_suspect in reddit.info(fullnames=check_ids):
-            # check that it was posted in november
-            if convert_time(removal_suspect.created_utc) > datetime.datetime(2019, 12, 1):
-                continue
+            # # check that it was posted in november
+            # if convert_time(removal_suspect.created_utc) > datetime.datetime(2019, 12, 1):
+            #     continue
             # check if they have the right flair
             try:
                 if removal_suspect.link_flair_template_id:
                     pass
             except AttributeError:
                 continue
-            if removal_suspect.link_flair_template_id == 'e186588a-fcc7-11e9-8108-0e38adec5b54':
-                # check if they have actually been removed
-                cursor.execute("SELECT id, action, target_author FROM modlog WHERE target_fullname = %s AND NOT action = 'editflair' ORDER BY created_utc DESC", (removal_suspect.name,))
-                current_state = cursor.fetchone()
-                if current_state and current_state[1] == 'removelink':
-                    # ban the user
-                    cursor.execute("SELECT id, created_utc FROM modlog WHERE target_author = %s AND mod = 'SachiMod' AND action = 'banuser' ORDER BY created_utc DESC", (current_state[2],))
-                    previous_violations = cursor.fetchall()
-                    if previous_violations:
-                        if len(previous_violations) == 1 and (datetime.datetime.now() - previous_violations[0][1] > datetime.timedelta(days=3)):
-                            ban_user(current_state[2], duration=7, note=f"2nd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Looks like the first ban did not drive the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) home. Maybe this will. See you in a week.\n\nThis is your last warning before being banned for the rest of the month. Make sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.')
-                            print(f"User: {current_state[2]} banned for the 2nd time")
-                        elif len(previous_violations) == 2 and (datetime.datetime.now() - previous_violations[0][1] > datetime.timedelta(days=7)):
-                            ban_user(current_state[2], duration=21, note=f"3rd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Since the previous two bans did not manage to explain that we really mean it with ["No Reposts" during "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/), you can just chill until December.')
-                            print(f"User: {current_state[2]} banned for the 3rd time")
-                    else:
-                        ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
-                        print(f"User: {current_state[2]} banned")
+            cursor.execute("UPDATE posts SET link_flair_template_id = %s, link_flair_text = %s WHERE id = %s", (removal_suspect.link_flair_template_id, removal_suspect.link_flair_text, removal_suspect.id))
+        #     if removal_suspect.link_flair_template_id == 'e186588a-fcc7-11e9-8108-0e38adec5b54':
+        #         # check if they have actually been removed
+        #         cursor.execute("SELECT id, action, target_author FROM modlog WHERE target_fullname = %s AND NOT action = 'editflair' ORDER BY created_utc DESC", (removal_suspect.name,))
+        #         current_state = cursor.fetchone()
+        #         if current_state and current_state[1] == 'removelink':
+        #             # ban the user
+        #             cursor.execute("SELECT id, created_utc FROM modlog WHERE target_author = %s AND mod = 'SachiMod' AND action = 'banuser' ORDER BY created_utc DESC", (current_state[2],))
+        #             previous_violations = cursor.fetchall()
+        #             if previous_violations:
+        #                 if len(previous_violations) == 1 and (datetime.datetime.now() - previous_violations[0][1] > datetime.timedelta(days=3)):
+        #                     ban_user(current_state[2], duration=7, note=f"2nd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Looks like the first ban did not drive the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) home. Maybe this will. See you in a week.\n\nThis is your last warning before being banned for the rest of the month. Make sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.')
+        #                     print(f"User: {current_state[2]} banned for the 2nd time")
+        #                 elif len(previous_violations) == 2 and (datetime.datetime.now() - previous_violations[0][1] > datetime.timedelta(days=7)):
+        #                     ban_user(current_state[2], duration=21, note=f"3rd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Since the previous two bans did not manage to explain that we really mean it with ["No Reposts" during "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/), you can just chill until December.')
+        #                     print(f"User: {current_state[2]} banned for the 3rd time")
+        #             else:
+        #                 ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
+        #                 print(f"User: {current_state[2]} banned")
         for entry in edit_flair_list:
             cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
         db_conn.commit()
