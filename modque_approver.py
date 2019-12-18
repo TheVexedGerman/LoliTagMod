@@ -185,7 +185,7 @@ def check_for_improper_spoilers(new_post_list):
                 # check if the ids are identical
                 if entry != current_new_post_list[i+offset]:
                     print(f"{submission.id}: {submission.created_utc} was removed")
-                    cursor.execute("UPDATE posts SET estimated_deletion_time = %s WHERE id = %s", (datetime.datetime.now(), submission.id))
+                    cursor.execute("UPDATE posts SET estimated_deletion_time = %s WHERE id = %s", (datetime.datetime.now(), entry))
                     # move the offset one back because the new list is now missing one entry.
                     offset += -1
     # set the new list to be the one checked next time
