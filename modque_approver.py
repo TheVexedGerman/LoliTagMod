@@ -56,10 +56,10 @@ def main():
     watched_id_report_dict = {}
     # run_bot()
     while True:
-        run_bot(new_post_list)
+        run_bot()
 
 
-def run_bot(new_post_list):
+def run_bot():
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching modqueue...")
     for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
