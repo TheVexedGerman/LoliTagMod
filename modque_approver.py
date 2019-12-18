@@ -182,6 +182,7 @@ def check_for_improper_spoilers(new_post_list):
             if i + offset >= len(current_new_post_list):
                 break
             else:
+                # improve this so it doesn't automatically go to the next entry.
                 # check if the ids are identical
                 if entry != current_new_post_list[i+offset]:
                     print(f"{submission.id}: {submission.created_utc} was removed")
@@ -298,11 +299,14 @@ def approve_old_reposts():
 def approve_flagged_but_now_spoiler_tagged_memes(reports):
     if not reports.mod_reports:
         return
+    if len(reports.mod_reports) > 1:
+        return
     if reports.user_reports:
         return
     if 'Possible spoiler format in title, no tagging' in reports.mod_reports[0][0]:
         print("Spoiler tag rectified")
-        reports.mod.approve()
+        if reports.spoiler:
+            reports.mod.approve()
 
 def approve_weekend_reaction_meme_reposts(reports):
     if not reports.mod_reports:
