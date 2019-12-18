@@ -21,6 +21,7 @@ tsuminoKey = 1
 ehentaiKey = 2
 hitomilaKey = 3
 
+new_post_list = []
 
 PARSED_SUBREDDIT = 'Animemes'
 FLAIR_ID = "094ce764-898a-11e9-b1bf-0e66eeae092c"
@@ -53,7 +54,6 @@ def main():
     watched_id_set = set()
     global watched_id_report_dict
     watched_id_report_dict = {}
-    new_post_list = []
     # run_bot()
     while True:
         run_bot(new_post_list)
