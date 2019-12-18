@@ -53,14 +53,13 @@ def main():
     watched_id_set = set()
     global watched_id_report_dict
     watched_id_report_dict = {}
-    global new_post_list
     new_post_list = []
     # run_bot()
     while True:
-        run_bot()
+        run_bot(new_post_list)
 
 
-def run_bot():
+def run_bot(new_post_list):
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching modqueue...")
     for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
@@ -77,7 +76,7 @@ def run_bot():
                 print("Removing Comment")
                 comment.mod.remove(spam=False)
     print("Checking for improper spoilers")
-    check_for_improper_spoilers()
+    new_post_list = check_for_improper_spoilers(new_post_list)
     print("Checking for re-reported reposts")
     approve_old_reposts()
     print("Checking hentaimemes queue comments")
@@ -144,7 +143,7 @@ def get_offset(new, old):
         return get_offset(new, old[1:])
 
 
-def check_for_improper_spoilers():
+def check_for_improper_spoilers(new_post_list):
     current_new_post_list = []
     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
         # check for spoiler formatted title but no spoiler tag
@@ -188,7 +187,7 @@ def check_for_improper_spoilers():
                     # move the offset one back because the new list is now missing one entry.
                     offset += -1
     # set the new list to be the one checked next time
-    new_post_list = current_new_post_list
+    return current_new_post_list
         
 
 def check_for_improper_urls(comment):
