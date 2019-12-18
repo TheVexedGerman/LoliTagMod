@@ -53,6 +53,8 @@ def main():
     watched_id_set = set()
     global watched_id_report_dict
     watched_id_report_dict = {}
+    global new_post_list
+    new_post_list = []
     # run_bot()
     while True:
         run_bot()
@@ -135,7 +137,15 @@ def check_for_violation(comment):
     return False, isRedacted
 
 
+def get_offset(new, old):
+    try:
+        return new.index(old[0])
+    except ValueError:
+        return get_offset(new, old[1:])
+
+
 def check_for_improper_spoilers():
+    current_new_post_list = []
     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
         # check for spoiler formatted title but no spoiler tag
         if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
@@ -159,6 +169,27 @@ def check_for_improper_spoilers():
                         submission.flair.select('c87c2ac6-1dd4-11ea-9a24-0ea0ae2c9561', text="Rule 10: Post Quality - Low Res")
             except:
                 print(traceback.format_exc())
+        #create a list of ids currently in new
+        current_new_post_list.append(submission.id)
+
+    # make sure there is a previous list
+    if new_post_list:
+        # determine the offset between the old and the new list
+        offset = get_offset(current_new_post_list, new_post_list)
+        for i, entry in enumerate(new_post_list):
+            # exit if the end of new list has been reached.
+            if i + offset > len(current_new_post_list):
+                break
+            else:
+                # check if the ids are identical
+                if entry != current_new_post_list[i+offset]:
+                    print(f"{submission.id}: {submission.created_utc} was removed")
+                    cursor.execute("UPDATE posts SET estimated_deletion_time = %s WHERE id = %s", (datetime.datetime.now(), submission.id))
+                    # move the offset one back because the new list is now missing one entry.
+                    offset += -1
+    # set the new list to be the one checked next time
+    new_post_list = current_new_post_list
+        
 
 def check_for_improper_urls(comment):
     improper_nhentai_numbers = re.findall(r'((:?www.)?nhentai.net\/g\/.*?)(\d{1,6})', comment)
