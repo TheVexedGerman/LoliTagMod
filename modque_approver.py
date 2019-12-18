@@ -239,6 +239,7 @@ def approve_old_reposts():
         if datetime.datetime.now().weekday() > 4:
             approve_weekend_reaction_meme_reposts(reports)
         approve_weekend_reaction_memes(reports)
+        approve_flagged_but_now_spoiler_tagged_memes(reports)
         # Why can't I check if link flair exists without trying to get an exception?
         try:
             # check if there is a template ID (through AttributeError) and if the template ID matches the old repost one
@@ -293,6 +294,15 @@ def approve_old_reposts():
                         watched_id_set.remove(action.target_fullname[3:])
                         update_db(action.target_fullname[3:], watched_id_report_dict.pop(action.target_fullname[3:]))
 
+
+def approve_flagged_but_now_spoiler_tagged_memes(reports):
+    if not reports.mod_reports:
+        return
+    if reports.user_reports:
+        return
+    if 'Possible spoiler format in title, no tagging' in reports.mod_reports[0][0]:
+        print("Spoiler tag rectified")
+        reports.mod.approve()
 
 def approve_weekend_reaction_meme_reposts(reports):
     if not reports.mod_reports:
