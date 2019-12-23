@@ -171,7 +171,8 @@ def check_for_improper_spoilers(new_post_list):
                 except:
                     print(traceback.format_exc())
         except AttributeError:
-            print(traceback.format_exc())
+            # print(traceback.format_exc())
+            print(f"Post {submission.id} has no preview")
         #create a list of ids currently in new
         current_new_post_list.append(submission.id)
 
