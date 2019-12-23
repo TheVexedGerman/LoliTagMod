@@ -160,15 +160,18 @@ def check_for_improper_spoilers(new_post_list):
                 # improperly marked spoiler flair
                 submission.flair.select(FLAIR_ID)
         # remove low resolution images
-        if submission.preview:
-            try:
-                if submission.preview.get('images'):
-                    res = submission.preview['images'][0]
-                    if res['source']['height'] * res['source']['width'] < 100000:
-                        submission.mod.remove()
-                        submission.flair.select('c87c2ac6-1dd4-11ea-9a24-0ea0ae2c9561', text="Rule 10: Post Quality - Low Res")
-            except:
-                print(traceback.format_exc())
+        try:
+            if submission.preview:
+                try:
+                    if submission.preview.get('images'):
+                        res = submission.preview['images'][0]
+                        if res['source']['height'] * res['source']['width'] < 100000:
+                            submission.mod.remove()
+                            submission.flair.select('c87c2ac6-1dd4-11ea-9a24-0ea0ae2c9561', text="Rule 10: Post Quality - Low Res")
+                except:
+                    print(traceback.format_exc())
+        except AttributeError:
+            print(traceback.format_exc())
         #create a list of ids currently in new
         current_new_post_list.append(submission.id)
 
@@ -456,6 +459,12 @@ def modmail_fetcher():
         for reply in message.replies:
             cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, subject, author, parent_id, body) VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), reply.first_message_name, reply.subject, str(reply.author), reply.parent_id, reply.body))
         db_conn.commit()
+
+
+def awards_updater():
+    for post in reddit.subreddit("animemes").gilded(limit=100):
+        pass
+
 
 
 if __name__ == '__main__':
