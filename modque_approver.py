@@ -482,8 +482,7 @@ def awards_updater():
                 sub = reddit.subreddit('animemes')
                 stylesheet = sub.stylesheet().stylesheet
                 awards_css = generate_awards_css()
-                stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet)
-                print(stylesheet)
+                stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
                 sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
 
 
