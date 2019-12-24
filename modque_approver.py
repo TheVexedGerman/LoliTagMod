@@ -520,9 +520,9 @@ def get_mail():
         exists = cursor.fetchone()
         if exists and exists[1] == message.replies:
             break
-        cursor.execute("INSERT INTO sachimail (id, created_utc, first_message_name, replies, subject, author, body, was_comment, parent_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET replies = EXCLUDED.replies, sent_to_discord = false", (message.id, convert_time(message.created_utc), message.first_message_name, replies, message.subject, str(message.author), message.body, message.was_comment, message.parent_id))
+        cursor.execute("INSERT INTO sachimail (id, created_utc, first_message_name, replies, subject, author, body, was_comment, parent_id, context) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET replies = EXCLUDED.replies, sent_to_discord = false", (message.id, convert_time(message.created_utc), message.first_message_name, replies, message.subject, str(message.author), message.body, message.was_comment, message.parent_id, message.context))
         for reply in message.replies:
-            cursor.execute("INSERT INTO sachimail (id, created_utc, first_message_name, subject, author, parent_id, body, was_comment) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), reply.first_message_name, reply.subject, str(reply.author), reply.parent_id, reply.body, reply.was_comment))
+            cursor.execute("INSERT INTO sachimail (id, created_utc, first_message_name, subject, author, parent_id, body, was_comment, context) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), reply.first_message_name, reply.subject, str(reply.author), reply.parent_id, reply.body, reply.was_comment, message.context))
         db_conn.commit()
 
 
