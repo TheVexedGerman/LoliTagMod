@@ -100,6 +100,8 @@ def run_bot():
     ban_for_reposts()
     print("Fetching Modmail")
     modmail_fetcher()
+    print("Getting mail")
+    get_mail()
     print("Updating awards")
     awards_updater()
     print("Sleeping for 30 seconds...")
@@ -509,6 +511,20 @@ def generate_awards_css():
     for key in awards_dict.keys():
         css_string += f'a.awarding-link[data-award-id={key}]:hover:before {{\n    content: "{awards_dict[key]}";\n}}\n'
     return css_string
+
+
+def get_mail():
+    for message in reddit.inbox.all(limit=none):
+        cursor.execute("SELECT id, replies FROM modmail WHERE id = %s", [message.id])
+        replies = [reply.id for reply in message.replies]
+        exists = cursor.fetchone()
+        if exists and exists[1] == message.replies:
+            break
+        cursor.execute("INSERT INTO sachimail (id, created_utc, first_message_name, replies, subject, author, body, link_title, was_comment) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET replies = EXCLUDED.replies, sent_to_discord = false", (message.id, convert_time(message.created_utc), message.first_message_name, replies, message.subject, str(message.author), message.body, message.link_title, message.was_comment))
+        for reply in message.replies:
+            cursor.execute("INSERT INTO sachimail (id, created_utc, first_message_name, subject, author, parent_id, body, link_title, was_comment) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), reply.first_message_name, reply.subject, str(reply.author), reply.parent_id, reply.body, reply.link_title, reply.was_comment))
+        db_conn.commit()
+
 
 if __name__ == '__main__':
     while True:
