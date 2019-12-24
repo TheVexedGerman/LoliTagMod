@@ -54,6 +54,8 @@ def main():
     watched_id_set = set()
     global watched_id_report_dict
     watched_id_report_dict = {}
+    global awards_dict
+    awards_dict = get_awards_dict()
     # run_bot()
     while True:
         run_bot()
@@ -464,9 +466,43 @@ def modmail_fetcher():
 
 def awards_updater():
     for post in reddit.subreddit("animemes").gilded(limit=100):
-        pass
+        try:
+            if post.all_awardings:
+                pass
+        except:
+            continue
+        for award in post.all_awardings:
+            if not check_awards_membership(award):
+                cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
+                awards_dict.update({award['id']: award['name']})
+                sub = reddit.subreddit('animemes')
+                stylesheet = sub.stylesheet().stylesheet
+                awards_css = generate_awards_css()
+                stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/)*(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet)
+                sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
 
 
+def check_awards_membership(award):
+    for key in awards_dict.keys():
+        if key == award['id']:
+            return True
+    return False
+
+
+def get_awards_dict():
+    dic = {}
+    cursor.execute("SELECT id, name FROM awards")
+    awards = cursor.fetchall()
+    for award in awards:
+        dic.update({award[0]: award[1]})
+    return dic
+
+
+def generate_awards_css():
+    css_string = ''
+    for key in awards_dict.keys():
+        css_string += f'a.awarding-link[data-award-id={key}]:hover:before {{\n    content: "{awards_dict[key]}";\n}}'
+    return css_string
 
 if __name__ == '__main__':
     while True:
