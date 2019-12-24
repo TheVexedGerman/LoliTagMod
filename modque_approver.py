@@ -477,6 +477,7 @@ def awards_updater():
         for award in post.all_awardings:
             if not check_awards_membership(award):
                 cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
+                db_conn.commit()
                 awards_dict.update({award['id']: award['name']})
                 sub = reddit.subreddit('animemes')
                 stylesheet = sub.stylesheet().stylesheet
