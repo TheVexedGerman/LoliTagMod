@@ -488,9 +488,10 @@ def awards_updater():
 
 def check_awards_membership(award):
     # just try to see if the key is in the dict
-    for key in awards_dict.keys():
-        if key == award['id']:
-            return True
+    # for key in awards_dict.keys():
+    #     if key == award['id']:
+    if awards_dict.get(award['id']):
+        return True
     return False
 
 
