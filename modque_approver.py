@@ -514,7 +514,7 @@ def generate_awards_css():
 
 
 def get_mail():
-    for message in reddit.inbox.all(limit=none):
+    for message in reddit.inbox.all(limit=None):
         cursor.execute("SELECT id, replies FROM modmail WHERE id = %s", [message.id])
         replies = [reply.id for reply in message.replies]
         exists = cursor.fetchone()
