@@ -100,6 +100,8 @@ def run_bot():
     ban_for_reposts()
     print("Fetching Modmail")
     modmail_fetcher()
+    print("Updating awards")
+    awards_updater()
     print("Sleeping for 30 seconds...")
     time.sleep(30)
 
