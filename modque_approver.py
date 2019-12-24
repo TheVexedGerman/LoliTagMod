@@ -467,7 +467,7 @@ def modmail_fetcher():
 
 
 def awards_updater():
-    print(awards_dict)
+    # print(awards_dict)
     for post in reddit.subreddit("animemes").gilded(limit=100):
         try:
             if post.all_awardings:
@@ -483,6 +483,7 @@ def awards_updater():
                 stylesheet = sub.stylesheet().stylesheet
                 awards_css = generate_awards_css()
                 stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet)
+                print(stylesheet)
                 sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
 
 
