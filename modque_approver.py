@@ -480,11 +480,12 @@ def awards_updater():
                 sub = reddit.subreddit('animemes')
                 stylesheet = sub.stylesheet().stylesheet
                 awards_css = generate_awards_css()
-                stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/)*(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet)
+                stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet)
                 sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
 
 
 def check_awards_membership(award):
+    # just try to see if the key is in the dict
     for key in awards_dict.keys():
         if key == award['id']:
             return True
