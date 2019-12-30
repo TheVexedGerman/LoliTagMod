@@ -486,6 +486,22 @@ def awards_updater():
                 awards_css = generate_awards_css()
                 stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
                 sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
+    for post in reddit.subreddit("animemes").top(limit=100):
+        try:
+            if post.all_awardings:
+                pass
+        except:
+            continue
+        for award in post.all_awardings:
+            if not check_awards_membership(award):
+                cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
+                db_conn.commit()
+                awards_dict.update({award['id']: award['name']})
+                sub = reddit.subreddit('animemes')
+                stylesheet = sub.stylesheet().stylesheet
+                awards_css = generate_awards_css()
+                stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
+                sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
 
 
 def check_awards_membership(award):
