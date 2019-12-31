@@ -486,7 +486,7 @@ def awards_updater():
                 awards_css = generate_awards_css()
                 stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
                 sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
-    for post in reddit.subreddit("animemes").top(limit=100):
+    for post in reddit.subreddit("animemes").hot(limit=100):
         try:
             if post.all_awardings:
                 pass
