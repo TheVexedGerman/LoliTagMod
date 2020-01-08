@@ -152,9 +152,11 @@ def get_offset(new, old):
 
 def check_for_improper_spoilers(new_post_list):
     current_new_post_list = []
+    ignore_list = []
     cursor.execute("SELECT id FROM sachimod_ignore_posts WHERE created_utc < %s", (datetime.datetime.now(),))
     stored_ignore = cursor.fetchall()
-    ignore_list = [entry[0] for entry in stored_ignore]
+    if stored_ignore:
+        ignore_list = [entry[0] for entry in stored_ignore]
     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
         # check for spoiler formatted title but no spoiler tag
         if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
