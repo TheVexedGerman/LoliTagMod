@@ -152,6 +152,9 @@ def get_offset(new, old):
 
 def check_for_improper_spoilers(new_post_list):
     current_new_post_list = []
+    cursor.execute("SELECT id FROM sachimod_ignore_posts WHERE created_utc < %s", (datetime.datetime.now(),))
+    stored_ignore = cursor.fetchall()
+    ignore_list = [entry[0] for entry in stored_ignore]
     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
         # check for spoiler formatted title but no spoiler tag
         if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
@@ -166,19 +169,20 @@ def check_for_improper_spoilers(new_post_list):
                 # improperly marked spoiler flair
                 submission.flair.select(FLAIR_ID)
         # remove low resolution images
-        try:
-            if submission.preview:
-                try:
-                    if submission.preview.get('images'):
-                        res = submission.preview['images'][0]
-                        if res['source']['height'] * res['source']['width'] < 100000:
-                            submission.mod.remove()
-                            submission.flair.select('c87c2ac6-1dd4-11ea-9a24-0ea0ae2c9561', text="Rule 10: Post Quality - Low Res")
-                except:
-                    print(traceback.format_exc())
-        except AttributeError:
-            # print(traceback.format_exc())
-            print(f"Post {submission.id} has no preview")
+        if submission.id not in ignore_list:
+            try:
+                if submission.preview:
+                    try:
+                        if submission.preview.get('images'):
+                            res = submission.preview['images'][0]
+                            if res['source']['height'] * res['source']['width'] < 100000:
+                                submission.mod.remove()
+                                submission.flair.select('c87c2ac6-1dd4-11ea-9a24-0ea0ae2c9561', text="Rule 10: Post Quality - Low Res")
+                    except:
+                        print(traceback.format_exc())
+            except AttributeError:
+                # print(traceback.format_exc())
+                print(f"Post {submission.id} has no preview")
         #create a list of ids currently in new
         current_new_post_list.append(submission.id)
 
