@@ -153,7 +153,7 @@ def get_offset(new, old):
 def check_for_improper_spoilers(new_post_list):
     current_new_post_list = []
     ignore_list = []
-    cursor.execute("SELECT id FROM sachimod_ignore_posts WHERE created_utc < %s", (datetime.datetime.now(),))
+    cursor.execute("SELECT id FROM sachimod_ignore_posts WHERE created_utc > %s", (datetime.datetime.now()-datetime.timedelta(days=1),))
     stored_ignore = cursor.fetchall()
     if stored_ignore:
         ignore_list = [entry[0] for entry in stored_ignore]
@@ -166,10 +166,18 @@ def check_for_improper_spoilers(new_post_list):
             # check title for spoiler formatting
             match = re.search(r"\[.+?\]", submission.title)
             if not match:
-                print(f"Removeing: {submission.title}")
-                submission.mod.remove()
-                # improperly marked spoiler flair
-                submission.flair.select(FLAIR_ID)
+                if 'spoiler' in submission.title.lower():
+                    try:
+                        mod_reports = submission.mod_reports + submission.mod_reports_dismissed
+                    except AttributeError:
+                        mod_reports = submission.mod_reports
+                    if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
+                        submission.report('Spoiler tagged post, improper title format')
+                else:
+                    print(f"Removing: {submission.title}")
+                    submission.mod.remove()
+                    # improperly marked spoiler flair
+                    submission.flair.select(FLAIR_ID)
         # remove low resolution images
         if submission.id not in ignore_list:
             try:
