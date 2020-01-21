@@ -159,7 +159,7 @@ def check_for_improper_spoilers(new_post_list):
         ignore_list = [entry[0] for entry in stored_ignore]
     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
         # check for spoiler formatted title but no spoiler tag
-        if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[olympics]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
+        if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
             submission.report('Possible spoiler format in title, no tagging')
         # check for spoiler tag byt not properly formatted title
         if submission.spoiler:
