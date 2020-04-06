@@ -159,7 +159,7 @@ def check_for_improper_spoilers(new_post_list):
         ignore_list = [entry[0] for entry in stored_ignore]
     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
         # check for missing sources
-        if convert_time(submission.created_utc) < datetime.datetime.now - datetime.timedelta(minutes=30):
+        if convert_time(submission.created_utc) < (datetime.datetime.now() - datetime.timedelta(minutes=30)):
             if '[multiple]' in submission.title.lower():
                 cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (f"t3_{submission.id}", str(submission.author)))
                 tlc = cursor.fetchall()
