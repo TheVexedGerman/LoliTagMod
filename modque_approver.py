@@ -169,11 +169,11 @@ def check_for_improper_spoilers(new_post_list):
                     cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (automod[0], str(submission.author)))
                     op = cursor.fetchall()
                     if len(op) == 0:
+                        try:
+                            mod_reports = submission.mod_reports + submission.mod_reports_dismissed
+                        except AttributeError:
+                            mod_reports = submission.mod_reports
                         if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
-                            try:
-                                mod_reports = submission.mod_reports + submission.mod_reports_dismissed
-                            except AttributeError:
-                                mod_reports = submission.mod_reports
                             if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
                                 submission.report('No source comment detected after 30 min.')
                 
