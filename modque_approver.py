@@ -166,7 +166,7 @@ def check_for_improper_spoilers(new_post_list):
                 if len(tlc) == 0:
                     cursor.execute("SELECT id FROM comments WHERE parent_id = %s AND author = %s", (f"t3_{submission.id}", "AutoModerator"))
                     automod = cursor.fetchone()
-                    cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (automod[0], str(submission.author)))
+                    cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (f"t1_{automod[0]}", str(submission.author)))
                     op = cursor.fetchall()
                     if len(op) == 0:
                         try:
