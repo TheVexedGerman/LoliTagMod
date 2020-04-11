@@ -159,23 +159,23 @@ def check_for_improper_spoilers(new_post_list):
         ignore_list = [entry[0] for entry in stored_ignore]
     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
         # check for missing sources
-        if convert_time(submission.created_utc) < (datetime.datetime.now() - datetime.timedelta(minutes=30)):
-            if '[multiple]' in submission.title.lower():
-                cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (f"t3_{submission.id}", str(submission.author)))
-                tlc = cursor.fetchall()
-                if len(tlc) == 0:
-                    cursor.execute("SELECT id FROM comments WHERE parent_id = %s AND author = %s", (f"t3_{submission.id}", "AutoModerator"))
-                    automod = cursor.fetchone()
-                    cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (f"t1_{automod[0]}", str(submission.author)))
-                    op = cursor.fetchall()
-                    if len(op) == 0:
-                        try:
-                            mod_reports = submission.mod_reports + submission.mod_reports_dismissed
-                        except AttributeError:
-                            mod_reports = submission.mod_reports
-                        if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
-                            if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
-                                submission.report('No source comment detected after 30 min.')
+        # if convert_time(submission.created_utc) < (datetime.datetime.now() - datetime.timedelta(minutes=30)):
+        #     if '[multiple]' in submission.title.lower():
+        #         cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (f"t3_{submission.id}", str(submission.author)))
+        #         tlc = cursor.fetchall()
+        #         if len(tlc) == 0:
+        #             cursor.execute("SELECT id FROM comments WHERE parent_id = %s AND author = %s", (f"t3_{submission.id}", "AutoModerator"))
+        #             automod = cursor.fetchone()
+        #             cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (f"t1_{automod[0]}", str(submission.author)))
+        #             op = cursor.fetchall()
+        #             if len(op) == 0:
+        #                 try:
+        #                     mod_reports = submission.mod_reports + submission.mod_reports_dismissed
+        #                 except AttributeError:
+        #                     mod_reports = submission.mod_reports
+        #                 if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
+        #                     if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
+        #                         submission.report('No source comment detected after 30 min.')
                 
 
         # check for spoiler formatted title but no spoiler tag
