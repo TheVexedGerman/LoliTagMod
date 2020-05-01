@@ -483,11 +483,11 @@ def ban_for_reposts():
         #                 print(f"User: {current_state[2]} banned")
 
         # event removal processing
-            if removal_suspect.link_flair_template_id == '0d7f0624-778b-11ea-b469-0e806c939b77':
+            if removal_suspect.link_flair_template_id == 'eeaebb92-8b38-11ea-a432-0e232b3ed13d':
                 cursor.execute("SELECT id, created_utc, mod FROM modlog WHERE target_fullname = %s AND action = 'removelink' ORDER BY created_utc DESC", (removal_suspect.name,))
                 log_entry = cursor.fetchone()
                 if log_entry:
-                    cursor.execute("INSERT INTO event_removals (id, created_utc, mod, target_id, event) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (ID) DO NOTHING", (log_entry[0], log_entry[1], log_entry[2], removal_suspect.id, "Throwback"))
+                    cursor.execute("INSERT INTO event_removals (id, created_utc, mod, target_id, event) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (ID) DO NOTHING", (log_entry[0], log_entry[1], log_entry[2], removal_suspect.id, "NSFW Spoiler"))
         for entry in edit_flair_list:
             cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
         db_conn.commit()
