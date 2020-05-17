@@ -27,6 +27,24 @@ PARSED_SUBREDDIT = 'Animemes'
 FLAIR_ID = "094ce764-898a-11e9-b1bf-0e66eeae092c"
 # PARSED_SUBREDDIT = 'loli_tag_bot'
 
+SPOILER_REMOVAL_COMMENT = """Hello Onii-Chan, your comment has been removed for containing a broken spoiler tag.
+
+A space at the start breaks the tag on some Reddit platforms, you'll have to delete it for the tag to work properly.
+
+For clarity:
+
+- `>!This will work.!<`
+
+- `>! This will not.!<`
+
+Just edit your comment, and if it's fixed, your comment will be put back up.
+
+Thank you for your cooperation.
+
+---
+
+*I am a bot, and this action was performed automatically. Please [contact the moderators of this subreddit](https://www.reddit.com/message/compose?to=/r/Animemes) if you have any questions or concerns.*"""
+
 def authenticate():
     print("Authenticating...")
     reddit = praw.Reddit(
@@ -56,6 +74,10 @@ def main():
     watched_id_report_dict = {}
     global awards_dict
     awards_dict = get_awards_dict()
+    # Initialize the dictionary for spoiler comments which have been formatted incorrectly
+    global spoiler_comment_dict
+    spoiler_comment_dict = load_spoiler_dict()
+
     # run_bot()
     while True:
         run_bot()
@@ -77,6 +99,17 @@ def run_bot():
             else:
                 print("Removing Comment")
                 comment.mod.remove(spam=False)
+        broken_spoiler = re.search(r'!>\s+', comment.body)
+        if broken_spoiler:
+            comment.reply(SPOILER_REMOVAL_COMMENT)
+            comment.mod.remove()
+            if spoiler_comment_dict.get(comment.id):
+                spoiler_comment_dict[comment.id] = datetime.datetime.now()
+            else:
+                spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
+            save_spoiler_dict(spoiler_comment_dict)
+
+
     print("Checking for improper spoilers")
     global new_post_list
     new_post_list = check_for_improper_spoilers(new_post_list)
@@ -104,6 +137,7 @@ def run_bot():
     get_mail()
     print("Updating awards")
     awards_updater()
+    #TODO make a method that checks edited comments against the list and approves comments that have updated to fix the spoiler tag.
     print("Sleeping for 30 seconds...")
     time.sleep(30)
 
@@ -589,6 +623,33 @@ def get_mail():
         for reply in message.replies:
             cursor.execute("INSERT INTO sachimail (id, created_utc, first_message_name, subject, author, parent_id, body, was_comment, context) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), reply.first_message_name, reply.subject, str(reply.author), reply.parent_id, reply.body, reply.was_comment, message.context))
         db_conn.commit()
+
+
+def save_spoiler_dict(spoiler_dict):
+    with open("spoiler_comment_dict.json", "w") as f:
+        f.write(str(json.dumps(spoiler_dict)))
+
+def load_spoiler_dict():
+    #TODO make sure the dict get's loaded with the datetime
+    if not os.path.isfile("spoiler_comment_dict.json"):
+        json_obj = {}
+    else:
+        with open("spoiler_comment_dict.json", "r") as f:
+            json_obj = json.loads(f.read())
+    return json_obj
+
+def check_for_updated_comments():
+    for comment in reddit.subreddit('Animemes').mod.edited(only='comments', limit=100):
+        if comment.id in spoiler_comment_dict.keys():
+            broken_spoiler = re.search(r'!>\s+', comment.body)
+            if not broken_spoiler:
+                comment.mod.approve()
+                del spoiler_comment_dict[comment.id]
+    # clean up old comments that are unlikely to be edited.
+    for key in spoiler_comment_dict.keys():
+        if spoiler_comment_dict[key] < (datetime.datetime.now() - datetime.timedelta(days=1)):
+            del spoiler_comment_dict[comment.id]
+    save_spoiler_dict(spoiler_comment_dict)
 
 
 if __name__ == '__main__':
