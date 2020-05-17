@@ -214,7 +214,7 @@ def check_for_improper_spoilers(new_post_list):
 
         # check for spoiler formatted title but no spoiler tag
         if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
-            submission.report('Possible spoiler format in title, no tagging')
+            submission.report('Possibly missing spoiler tag')
         # check for spoiler tag byt not properly formatted title
         if submission.spoiler:
             # check title for spoiler formatting
