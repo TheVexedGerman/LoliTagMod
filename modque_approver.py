@@ -658,12 +658,13 @@ def convert_str_to_datetime(pairs):
 
 def check_for_updated_comments():
     # Check recent comments because ninja edits don't show up in the edited page.
-    for comment_id in spoiler_comment_dict.keys():
+    for comment_id in list(spoiler_comment_dict.keys()):
         if spoiler_comment_dict[comment_id] + datetime.timedelta(minutes=3) < datetime.datetime.now():
             comment = reddit.comment(id=comment_id)
             broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
             if not broken_spoiler:
                 comment.mod.approve()
+                del spoiler_comment_dict[comment.id]
     # Check for older edited comments
     for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.edited(only='comments', limit=100):
         if comment.id in list(spoiler_comment_dict.keys()):
