@@ -664,9 +664,9 @@ def check_for_updated_comments():
             broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
             if not broken_spoiler:
                 comment.mod.approve()
-                del spoiler_comment_dict[comment.id]
+    # Check for older edited comments
     for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.edited(only='comments', limit=100):
-        if comment.id in spoiler_comment_dict.keys():
+        if comment.id in list(spoiler_comment_dict.keys()):
             broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
             if not broken_spoiler:
                 comment.mod.approve()
