@@ -99,7 +99,7 @@ def run_bot():
             else:
                 print("Removing Comment")
                 comment.mod.remove(spam=False)
-        broken_spoiler = re.search(r'!>\s+', comment.body)
+        broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
         if broken_spoiler:
             comment.reply(SPOILER_REMOVAL_COMMENT)
             comment.mod.remove()
@@ -137,7 +137,8 @@ def run_bot():
     get_mail()
     print("Updating awards")
     awards_updater()
-    #TODO make a method that checks edited comments against the list and approves comments that have updated to fix the spoiler tag.
+    print("Checking for edited broken spoiler comments")
+    check_for_updated_comments()
     print("Sleeping for 30 seconds...")
     time.sleep(30)
 
@@ -461,7 +462,7 @@ def approve_weekend_reaction_memes(reports):
 
 
 def grab_modlog():
-    for action in reddit.subreddit("animemes").mod.log(limit=None):
+    for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit=None):
         cursor.execute("SELECT * FROM modlog WHERE id = %s", [action.id])
         exists = cursor.fetchone()
         if exists:
@@ -535,11 +536,11 @@ def ban_for_reposts():
 
 
 def ban_user(user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone did not understand the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) and should have some sense [smacked into them](https://i.imgur.com/4VsscZB.png). See you in three days\n\nMake sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.', duration = 3, note = "Automated ban for reposting a meme"):
-    reddit.subreddit('animemes').banned.add(user, ban_reason=ban_reason, ban_message=ban_message, duration=duration, note=note)
+    reddit.subreddit(PARSED_SUBREDDIT).banned.add(user, ban_reason=ban_reason, ban_message=ban_message, duration=duration, note=note)
 
 
 def modmail_fetcher():
-    for message in reddit.subreddit("Animemes").mod.inbox(limit=None):
+    for message in reddit.subreddit(PARSED_SUBREDDIT).mod.inbox(limit=None):
         cursor.execute("SELECT id, replies FROM modmail WHERE id = %s", [message.id])
         replies = [reply.id for reply in message.replies]
         exists = cursor.fetchone()
@@ -553,7 +554,7 @@ def modmail_fetcher():
 
 def awards_updater():
     # print(awards_dict)
-    for post in reddit.subreddit("animemes").gilded(limit=100):
+    for post in reddit.subreddit(PARSED_SUBREDDIT).gilded(limit=100):
         try:
             if post.all_awardings:
                 pass
@@ -564,12 +565,12 @@ def awards_updater():
                 cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
                 db_conn.commit()
                 awards_dict.update({award['id']: award['name']})
-                sub = reddit.subreddit('animemes')
+                sub = reddit.subreddit(PARSED_SUBREDDIT)
                 stylesheet = sub.stylesheet().stylesheet
                 awards_css = generate_awards_css()
                 stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
                 sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
-    for post in reddit.subreddit("animemes").hot(limit=100):
+    for post in reddit.subreddit(PARSED_SUBREDDIT).hot(limit=100):
         try:
             if post.all_awardings:
                 pass
@@ -580,7 +581,7 @@ def awards_updater():
                 cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
                 db_conn.commit()
                 awards_dict.update({award['id']: award['name']})
-                sub = reddit.subreddit('animemes')
+                sub = reddit.subreddit(PARSED_SUBREDDIT)
                 stylesheet = sub.stylesheet().stylesheet
                 awards_css = generate_awards_css()
                 stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
@@ -627,7 +628,7 @@ def get_mail():
 
 def save_spoiler_dict(spoiler_dict):
     with open("spoiler_comment_dict.json", "w") as f:
-        f.write(str(json.dumps(spoiler_dict)))
+        f.write(str(json.dumps(spoiler_dict, default=convert_datetime)))
 
 def load_spoiler_dict():
     #TODO make sure the dict get's loaded with the datetime
@@ -635,13 +636,29 @@ def load_spoiler_dict():
         json_obj = {}
     else:
         with open("spoiler_comment_dict.json", "r") as f:
-            json_obj = json.loads(f.read())
+            json_obj = json.loads(f.read(), object_pairs_hook=convert_str_to_datetime)
     return json_obj
 
+def convert_datetime(date):
+        return date.isoformat()
+
+def convert_str_to_datetime(pairs):
+    dic = {}
+    for key, value in pairs:
+        if isinstance(value, str):
+            try:
+                dt, _, us = value.partition(".")
+                dic[key] = datetime.datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                dic[key] = value
+        else:
+            dic[key] = value            
+    return dic
+
 def check_for_updated_comments():
-    for comment in reddit.subreddit('Animemes').mod.edited(only='comments', limit=100):
+    for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.edited(only='comments', limit=100):
         if comment.id in spoiler_comment_dict.keys():
-            broken_spoiler = re.search(r'!>\s+', comment.body)
+            broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
             if not broken_spoiler:
                 comment.mod.approve()
                 del spoiler_comment_dict[comment.id]
