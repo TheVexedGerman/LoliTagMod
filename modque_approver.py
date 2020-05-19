@@ -101,7 +101,8 @@ def run_bot():
                 comment.mod.remove(spam=False)
         broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
         if broken_spoiler:
-            comment.reply(SPOILER_REMOVAL_COMMENT)
+            reply = comment.reply(SPOILER_REMOVAL_COMMENT)
+            reply.mod.distinguish(how='yes')
             comment.mod.remove()
             if spoiler_comment_dict.get(comment.id):
                 spoiler_comment_dict[comment.id] = datetime.datetime.now()
