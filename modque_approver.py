@@ -675,7 +675,7 @@ def check_for_updated_comments():
     # clean up old comments that are unlikely to be edited.
     for key in list(spoiler_comment_dict.keys()):
         if spoiler_comment_dict[key] < (datetime.datetime.now() - datetime.timedelta(days=1)):
-            del spoiler_comment_dict[comment.id]
+            del spoiler_comment_dict[key]
     save_spoiler_dict(spoiler_comment_dict)
 
 
