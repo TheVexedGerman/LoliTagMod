@@ -24,7 +24,7 @@ hitomilaKey = 3
 new_post_list = []
 
 PARSED_SUBREDDIT = 'Animemes'
-FLAIR_ID = "094ce764-898a-11e9-b1bf-0e66eeae092c"
+# FLAIR_ID = "094ce764-898a-11e9-b1bf-0e66eeae092c"
 # PARSED_SUBREDDIT = 'loli_tag_bot'
 
 SPOILER_REMOVAL_COMMENT = """Hello Onii-Chan, your comment has been removed for containing a broken spoiler tag.
@@ -60,19 +60,19 @@ def authenticate():
 
 
 def main():
-    global reddit
-    global reddit2
+    # global reddit
+    # global reddit2
     reddit, reddit2 = authenticate()
-    global cursor
-    global db_conn
-    global cursor2
-    global db_conn2
+    # global cursor
+    # global db_conn
+    # global cursor2
+    # global db_conn2
     db_conn, cursor, db_conn2, cursor2 = authenticate_db()
-    global watched_id_set
+    # global watched_id_set
     watched_id_set = set()
-    global watched_id_report_dict
+    # global watched_id_report_dict
     watched_id_report_dict = {}
-    global awards_dict
+    # global awards_dict
     awards_dict = get_awards_dict()
     # Initialize the dictionary for spoiler comments which have been formatted incorrectly
     global spoiler_comment_dict
@@ -83,32 +83,165 @@ def main():
         run_bot()
 
 
-def run_bot():
+def modqueue_loop(reddit, subreddit):
+    for item in reddit.subreddit(subreddit).mod.modqueue(limit=None):
+        # do comment loops actions
+        if item.name[:2] == 't1':
+            # automatically approve comments made by the bot
+            if item.author.name == 'AnimemesBot':
+                item.mod.approve()
+                continue
+
+            # check if the comment is linking to loli content
+            if check_for_sholi_links(item):
+                continue
+
+            # check of the comment has a broken spoiler
+            if check_for_broken_comment_spoilers(item):
+                continue
+
+        # do post loops acttions
+        elif item.name[:2] == 't3':
+            pass
+
+
+def check_for_sholi_links(comment):
+    has_numbers, has_redaction = check_for_violation(comment.body)
+    if has_numbers:
+        if not has_redaction:
+            print("Approving Comment")
+            comment.mod.approve()
+            return True
+        else:
+            print("Removing Comment")
+            comment.mod.remove(spam=False)
+            return True
+    return False
+
+
+def check_for_broken_comment_spoilers(comment):
+    broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
+    if broken_spoiler:
+        reply = comment.reply(SPOILER_REMOVAL_COMMENT)
+        reply.mod.distinguish(how='yes')
+        comment.mod.remove()
+        if spoiler_comment_dict.get(comment.id):
+            spoiler_comment_dict[comment.id] = datetime.datetime.now()
+        else:
+            spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
+        save_spoiler_dict(spoiler_comment_dict)
+        return True
+    return False
+
+def new_posts_loop(reddit, subreddit):
+    current_new_post_list = []
+    for submission in reddit.subreddit(subreddit).new(limit=100):
+        # make a list of current new posts
+        current_new_post_list.append(submission.id)
+
+        # check for spoiler formatted title but no spoiler tag
+        if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[contest]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
+            submission.report('Possibly missing spoiler tag')
+
+        # check if the post is spoiler marked but not titled correctly:
+        check_for_improper_title_spoiler_marks(submission)
+
+        # check if the post is nsfw tagged but not spoiler tagged:
+        check_for_nsfw_tagging(submission)
+
+def post_new_posts_loop(new_post_list, current_new_post_list, cursor):
+    if new_post_list:
+        # determine the offset between the old and the new list
+        offset = get_offset(current_new_post_list, new_post_list)
+        for i, entry in enumerate(new_post_list):
+            # exit if the end of new list has been reached.
+            if i + offset >= len(current_new_post_list):
+                break
+            else:
+                # improve this so it doesn't automatically go to the next entry.
+                # check if the ids are identical
+                if entry != current_new_post_list[i+offset]:
+                    print(f"{entry} was removed")
+                    cursor.execute("UPDATE posts SET estimated_deletion_time = %s WHERE id = %s", (datetime.datetime.now(), entry))
+                    # move the offset one back because the new list is now missing one entry.
+                    offset += -1
+    # set the new list to be the one checked next time
+    return current_new_post_list
+
+def check_for_minimum_image_size(submission):
+    try:
+        if submission.preview:
+            try:
+                if submission.preview.get('images'):
+                    res = submission.preview['images'][0]
+                    if res['source']['height'] * res['source']['width'] < 100000:
+                        submission.mod.remove()
+                        submission.flair.select('c87c2ac6-1dd4-11ea-9a24-0ea0ae2c9561', text="Rule 10: Post Quality - Low Res")
+            except:
+                print(traceback.format_exc())
+    except AttributeError:
+        # print(traceback.format_exc())
+        print(f"Post {submission.id} has no preview")
+
+        
+def check_for_nsfw_tagging(submission):
+    if submission.over_18:
+        if '[nsfw]' not in submission.title.lower():
+            submission.mod.remove()
+            submission.flair.select('eeaebb92-8b38-11ea-a432-0e232b3ed13d')
+        
+def check_for_improper_title_spoiler_marks(submission):
+    # check for spoiler tag but not properly formatted title
+    if submission.spoiler:
+        # check title for spoiler formatting
+        match = re.search(r"\[.+?\]", submission.title)
+        if not match:
+            if 'spoiler' in submission.title.lower():
+                try:
+                    mod_reports = submission.mod_reports + submission.mod_reports_dismissed
+                except AttributeError:
+                    mod_reports = submission.mod_reports
+                if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
+                    submission.report('Spoiler tagged post, improper title format')
+            else:
+                print(f"Removing: {submission.title}")
+                submission.mod.remove()
+                # improperly marked spoiler flair
+                submission.flair.select("094ce764-898a-11e9-b1bf-0e66eeae092c")
+
+
+def run_bot(reddit):
+    # modqueue loop
+    modqueue_loop(reddit, "Animemes")
+    # new posts loop
+    new_posts_loop(reddit, "Animemes")
+
+
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching modqueue...")
-    for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
-        if comment.author.name == 'AnimemesBot':
-            comment.mod.approve()
-            continue
-        print(comment.body)
-        has_numbers, has_redaction = check_for_violation(comment.body)
-        if has_numbers:
-            if not has_redaction:
-                print("Approving Comment")
-                comment.mod.approve()
-            else:
-                print("Removing Comment")
-                comment.mod.remove(spam=False)
-        broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
-        if broken_spoiler:
-            reply = comment.reply(SPOILER_REMOVAL_COMMENT)
-            reply.mod.distinguish(how='yes')
-            comment.mod.remove()
-            if spoiler_comment_dict.get(comment.id):
-                spoiler_comment_dict[comment.id] = datetime.datetime.now()
-            else:
-                spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
-            save_spoiler_dict(spoiler_comment_dict)
+    # for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
+        # if comment.author.name == 'AnimemesBot':
+        #     comment.mod.approve()
+        #     continue
+        # print(comment.body)
+        # has_numbers, has_redaction = check_for_violation(comment.body)
+        # if has_numbers:
+        #     if not has_redaction:
+        #         print("Approving Comment")
+        #         comment.mod.approve()
+        #     else:
+        #         print("Removing Comment")
+        #         comment.mod.remove(spam=False)
+        # broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
+        # if broken_spoiler:
+        #     reply = comment.reply(SPOILER_REMOVAL_COMMENT)
+        #     reply.mod.distinguish(how='yes')
+        #     comment.mod.remove()
+        #     if spoiler_comment_dict.get(comment.id):
+        #         spoiler_comment_dict[comment.id] = datetime.datetime.now()
+        #     else:
+        #         spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
+        #     save_spoiler_dict(spoiler_comment_dict)
 
 
     print("Checking for improper spoilers")
@@ -186,98 +319,98 @@ def get_offset(new, old):
         return get_offset(new, old[1:])
 
 
-def check_for_improper_spoilers(new_post_list):
-    current_new_post_list = []
-    ignore_list = []
-    cursor.execute("SELECT id FROM sachimod_ignore_posts WHERE created_utc > %s", (datetime.datetime.now()-datetime.timedelta(days=1),))
-    stored_ignore = cursor.fetchall()
-    if stored_ignore:
-        ignore_list = [entry[0] for entry in stored_ignore]
-    for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
-        # check for missing sources
-        # if convert_time(submission.created_utc) < (datetime.datetime.now() - datetime.timedelta(minutes=30)):
-        #     if '[multiple]' in submission.title.lower():
-        #         cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (f"t3_{submission.id}", str(submission.author)))
-        #         tlc = cursor.fetchall()
-        #         if len(tlc) == 0:
-        #             cursor.execute("SELECT id FROM comments WHERE parent_id = %s AND author = %s", (f"t3_{submission.id}", "AutoModerator"))
-        #             automod = cursor.fetchone()
-        #             cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (f"t1_{automod[0]}", str(submission.author)))
-        #             op = cursor.fetchall()
-        #             if len(op) == 0:
-        #                 try:
-        #                     mod_reports = submission.mod_reports + submission.mod_reports_dismissed
-        #                 except AttributeError:
-        #                     mod_reports = submission.mod_reports
-        #                 if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
-        #                     if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
-        #                         submission.report('No source comment detected after 30 min.')
+# def check_for_improper_spoilers(new_post_list):
+#     current_new_post_list = []
+#     ignore_list = []
+#     cursor.execute("SELECT id FROM sachimod_ignore_posts WHERE created_utc > %s", (datetime.datetime.now()-datetime.timedelta(days=1),))
+#     stored_ignore = cursor.fetchall()
+#     if stored_ignore:
+#         ignore_list = [entry[0] for entry in stored_ignore]
+#     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
+#         # check for missing sources
+#         # if convert_time(submission.created_utc) < (datetime.datetime.now() - datetime.timedelta(minutes=30)):
+#         #     if '[multiple]' in submission.title.lower():
+#         #         cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (f"t3_{submission.id}", str(submission.author)))
+#         #         tlc = cursor.fetchall()
+#         #         if len(tlc) == 0:
+#         #             cursor.execute("SELECT id FROM comments WHERE parent_id = %s AND author = %s", (f"t3_{submission.id}", "AutoModerator"))
+#         #             automod = cursor.fetchone()
+#         #             cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (f"t1_{automod[0]}", str(submission.author)))
+#         #             op = cursor.fetchall()
+#         #             if len(op) == 0:
+#         #                 try:
+#         #                     mod_reports = submission.mod_reports + submission.mod_reports_dismissed
+#         #                 except AttributeError:
+#         #                     mod_reports = submission.mod_reports
+#         #                 if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
+#         #                     if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
+#         #                         submission.report('No source comment detected after 30 min.')
                 
 
-        # check for spoiler formatted title but no spoiler tag
-        if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler and '[contest]' not in submission.title.lower():
-            submission.report('Possibly missing spoiler tag')
-        # check for spoiler tag byt not properly formatted title
-        if submission.spoiler:
-            # check title for spoiler formatting
-            match = re.search(r"\[.+?\]", submission.title)
-            if not match:
-                if 'spoiler' in submission.title.lower():
-                    try:
-                        mod_reports = submission.mod_reports + submission.mod_reports_dismissed
-                    except AttributeError:
-                        mod_reports = submission.mod_reports
-                    if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
-                        submission.report('Spoiler tagged post, improper title format')
-                else:
-                    print(f"Removing: {submission.title}")
-                    submission.mod.remove()
-                    # improperly marked spoiler flair
-                    submission.flair.select(FLAIR_ID)
-        # remove low resolution images
+#         # check for spoiler formatted title but no spoiler tag
+#         if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler and '[contest]' not in submission.title.lower():
+#             submission.report('Possibly missing spoiler tag')
+#         # check for spoiler tag byt not properly formatted title
+#         if submission.spoiler:
+#             # check title for spoiler formatting
+#             match = re.search(r"\[.+?\]", submission.title)
+#             if not match:
+#                 if 'spoiler' in submission.title.lower():
+#                     try:
+#                         mod_reports = submission.mod_reports + submission.mod_reports_dismissed
+#                     except AttributeError:
+#                         mod_reports = submission.mod_reports
+#                     if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
+#                         submission.report('Spoiler tagged post, improper title format')
+#                 else:
+#                     print(f"Removing: {submission.title}")
+#                     submission.mod.remove()
+#                     # improperly marked spoiler flair
+#                     submission.flair.select(FLAIR_ID)
+#         # remove low resolution images
 
-        # check for nsfw tagging
-        if submission.over_18:
-            if '[nsfw]' not in submission.title.lower():
-                submission.mod.remove()
-                submission.flair.select('eeaebb92-8b38-11ea-a432-0e232b3ed13d')
+#         # check for nsfw tagging
+#         if submission.over_18:
+#             if '[nsfw]' not in submission.title.lower():
+#                 submission.mod.remove()
+#                 submission.flair.select('eeaebb92-8b38-11ea-a432-0e232b3ed13d')
 
-        if submission.id not in ignore_list:
-            try:
-                if submission.preview:
-                    try:
-                        if submission.preview.get('images'):
-                            res = submission.preview['images'][0]
-                            if res['source']['height'] * res['source']['width'] < 100000:
-                                submission.mod.remove()
-                                submission.flair.select('c87c2ac6-1dd4-11ea-9a24-0ea0ae2c9561', text="Rule 10: Post Quality - Low Res")
-                    except:
-                        print(traceback.format_exc())
-            except AttributeError:
-                # print(traceback.format_exc())
-                print(f"Post {submission.id} has no preview")
-        #create a list of ids currently in new
-        current_new_post_list.append(submission.id)
+#         if submission.id not in ignore_list:
+#             try:
+#                 if submission.preview:
+#                     try:
+#                         if submission.preview.get('images'):
+#                             res = submission.preview['images'][0]
+#                             if res['source']['height'] * res['source']['width'] < 100000:
+#                                 submission.mod.remove()
+#                                 submission.flair.select('c87c2ac6-1dd4-11ea-9a24-0ea0ae2c9561', text="Rule 10: Post Quality - Low Res")
+#                     except:
+#                         print(traceback.format_exc())
+#             except AttributeError:
+#                 # print(traceback.format_exc())
+#                 print(f"Post {submission.id} has no preview")
+#         #create a list of ids currently in new
+#         current_new_post_list.append(submission.id)
 
-    # make sure there is a previous list
-    print(new_post_list)
-    if new_post_list:
-        # determine the offset between the old and the new list
-        offset = get_offset(current_new_post_list, new_post_list)
-        for i, entry in enumerate(new_post_list):
-            # exit if the end of new list has been reached.
-            if i + offset >= len(current_new_post_list):
-                break
-            else:
-                # improve this so it doesn't automatically go to the next entry.
-                # check if the ids are identical
-                if entry != current_new_post_list[i+offset]:
-                    print(f"{submission.id}: {submission.created_utc} was removed")
-                    cursor.execute("UPDATE posts SET estimated_deletion_time = %s WHERE id = %s", (datetime.datetime.now(), entry))
-                    # move the offset one back because the new list is now missing one entry.
-                    offset += -1
-    # set the new list to be the one checked next time
-    return current_new_post_list
+#     # make sure there is a previous list
+#     print(new_post_list)
+#     if new_post_list:
+#         # determine the offset between the old and the new list
+#         offset = get_offset(current_new_post_list, new_post_list)
+#         for i, entry in enumerate(new_post_list):
+#             # exit if the end of new list has been reached.
+#             if i + offset >= len(current_new_post_list):
+#                 break
+#             else:
+#                 # improve this so it doesn't automatically go to the next entry.
+#                 # check if the ids are identical
+#                 if entry != current_new_post_list[i+offset]:
+#                     print(f"{submission.id}: {submission.created_utc} was removed")
+#                     cursor.execute("UPDATE posts SET estimated_deletion_time = %s WHERE id = %s", (datetime.datetime.now(), entry))
+#                     # move the offset one back because the new list is now missing one entry.
+#                     offset += -1
+#     # set the new list to be the one checked next time
+#     return current_new_post_list
         
 
 def check_for_improper_urls(comment):
