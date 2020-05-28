@@ -98,17 +98,25 @@ def run_bot():
                 comment.mod.approve()
             else:
                 print("Removing Comment")
-                comment.mod.remove(spam=False)
+                comment.mod.remove(spam=False, mod_note='Sholi link')
         broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
         if broken_spoiler:
             reply = comment.reply(SPOILER_REMOVAL_COMMENT)
             reply.mod.distinguish(how='yes')
-            comment.mod.remove()
+            comment.mod.remove(mod_note="Incorrectly formatted spoiler")
             if spoiler_comment_dict.get(comment.id):
                 spoiler_comment_dict[comment.id] = datetime.datetime.now()
             else:
                 spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
             save_spoiler_dict(spoiler_comment_dict)
+        
+        try:
+            # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
+            # python checks for the existence of an object instead of just a bool.
+            if comment.banned_by == True:
+                comment.mod.remove(mod_note="Shadowbanned account")
+        except AttributeError:
+            pass
 
 
     print("Checking for improper spoilers")
