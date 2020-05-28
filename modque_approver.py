@@ -87,10 +87,13 @@ def run_bot():
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching modqueue...")
     for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
+        print(comment.body)
         if comment.author.name == 'AnimemesBot':
             comment.mod.approve()
             continue
-        print(comment.body)
+        if comment.author.name == 'RepostSleuthBot':
+            if "There's a good chance this is unique!" in comment.body:
+                comment.mod.approve()
         has_numbers, has_redaction = check_for_violation(comment.body)
         if has_numbers:
             if not has_redaction:
