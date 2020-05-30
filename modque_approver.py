@@ -27,7 +27,9 @@ PARSED_SUBREDDIT = 'Animemes'
 FLAIR_ID = "094ce764-898a-11e9-b1bf-0e66eeae092c"
 # PARSED_SUBREDDIT = 'loli_tag_bot'
 
-SPOILER_REMOVAL_COMMENT = """Hello Onii-Chan, your comment has been removed for containing a broken spoiler tag.
+COMMENT_FOOTER = "---\n\n*I am a bot, and this action was performed automatically. Please [contact the moderators of this subreddit](https://www.reddit.com/message/compose?to=/r/Animemes) if you have any questions or concerns.*"
+
+SPOILER_REMOVAL_COMMENT = f"""Hello Onii-Chan, your comment has been removed for containing a broken spoiler tag.
 
 A space at the start breaks the tag on some Reddit platforms, you'll have to delete it for the tag to work properly.
 
@@ -41,9 +43,17 @@ Just edit your comment, and if it's fixed, your comment will be put back up.
 
 Thank you for your cooperation.
 
----
+{COMMENT_FOOTER}"""
 
-*I am a bot, and this action was performed automatically. Please [contact the moderators of this subreddit](https://www.reddit.com/message/compose?to=/r/Animemes) if you have any questions or concerns.*"""
+
+SHADOWBAN_REMOVAL_COMMENT = f"""Hello Onii-Chan, your account seems to be shadowbanned.  
+
+This was not an action taken by the /r/Animemes mods, but a site admin for something you were reported for in the past. I'd recommend going to /r/ShadowBan for more information.
+
+{COMMENT_FOOTER}"""
+
+
+
 
 def authenticate():
     print("Authenticating...")
@@ -94,6 +104,7 @@ def run_bot():
         if comment.author.name == 'RepostSleuthBot':
             if "There's a good chance this is unique!" in comment.body:
                 comment.mod.approve()
+                continue
         has_numbers, has_redaction = check_for_violation(comment.body)
         if has_numbers:
             if not has_redaction:
@@ -103,6 +114,7 @@ def run_bot():
                 print("Removing Comment")
                 comment.mod.remove(spam=False, mod_note='Sholi link')
         broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
+        # TODO approve comments that got edited before being processed.
         if broken_spoiler:
             reply = comment.reply(SPOILER_REMOVAL_COMMENT)
             reply.mod.distinguish(how='yes')
@@ -117,6 +129,8 @@ def run_bot():
             # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
             # python checks for the existence of an object instead of just a bool.
             if comment.banned_by == True:
+                comment.reply(SHADOWBAN_REMOVAL_COMMENT)
+                reply.mod.distinguish(how='yes')
                 comment.mod.remove(mod_note="Shadowbanned account")
         except AttributeError:
             pass
