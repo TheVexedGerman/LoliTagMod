@@ -129,7 +129,7 @@ def run_bot():
             # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
             # python checks for the existence of an object instead of just a bool.
             if comment.banned_by == True:
-                comment.reply(SHADOWBAN_REMOVAL_COMMENT)
+                reply = comment.reply(SHADOWBAN_REMOVAL_COMMENT)
                 reply.mod.distinguish(how='yes')
                 comment.mod.remove(mod_note="Shadowbanned account")
         except AttributeError:
