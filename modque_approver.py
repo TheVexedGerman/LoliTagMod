@@ -262,10 +262,10 @@ def check_for_improper_spoilers(new_post_list):
         # remove low resolution images
 
         # check for nsfw tagging
-        if submission.over_18:
-            if '[nsfw]' not in submission.title.lower():
-                submission.mod.remove()
-                submission.flair.select('eeaebb92-8b38-11ea-a432-0e232b3ed13d')
+        # if submission.over_18:
+        #     if '[nsfw]' not in submission.title.lower():
+        #         submission.mod.remove()
+        #         submission.flair.select('eeaebb92-8b38-11ea-a432-0e232b3ed13d')
 
         if submission.id not in ignore_list:
             try:
