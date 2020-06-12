@@ -103,7 +103,7 @@ def run_bot():
             comment.mod.approve()
             continue
         if comment.author.name == 'RepostSleuthBot':
-            if "There's a good chance this is unique!" in comment.body:
+            if "I didn't find any posts that meet the matching requirements" in comment.body:
                 comment.mod.approve()
                 continue
         has_numbers, has_redaction = check_for_violation(comment.body)
