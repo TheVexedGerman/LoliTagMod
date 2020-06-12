@@ -665,8 +665,11 @@ def load_spoiler_dict():
     if not os.path.isfile("spoiler_comment_dict.json"):
         json_obj = {}
     else:
-        with open("spoiler_comment_dict.json", "r") as f:
-            json_obj = json.loads(f.read(), object_pairs_hook=convert_str_to_datetime)
+        try:
+            with open("spoiler_comment_dict.json", "r") as f:
+                json_obj = json.loads(f.read(), object_pairs_hook=convert_str_to_datetime)
+        except json.decoder.JSONDecodeError:
+            json_obj = {}
     return json_obj
 
 def convert_datetime(date):
