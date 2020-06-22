@@ -361,7 +361,7 @@ def approve_old_reposts():
         try:
             # check if there is a template ID (through AttributeError) and if the template ID matches the old repost one
             # if reports.link_flair_template_id == "9a07b400-3c37-11e9-a73e-0e2a828fd580":
-            if reports.link_flair_template_id == "ed044fbe-6b03-11ea-83dc-0e22ffa9e5c3":
+            if "no dignity" in reports.link_flair_text.lower():
                 print(reports.title)
                 approve = True
                 report_dict = make_dict(reports.user_reports)
