@@ -96,10 +96,17 @@ def modqueue_loop(reddit, subreddit):
     for item in reddit.subreddit(subreddit).mod.modqueue(limit=None):
         # do comment loops actions
         if item.name[:2] == 't1':
+            print(item.body)
             # automatically approve comments made by the bot
             if item.author.name == 'AnimemesBot':
                 item.mod.approve()
                 continue
+
+            # automatically approve comments where the Sleuth couldn't find a repost
+            if item.author.name == 'RepostSleuthBot':
+                if "I didn't find any posts that meet the matching requirements" in item.body:
+                    item.mod.approve()
+                    continue
 
             # check if the comment is linking to loli content
             if check_for_sholi_links(item):
@@ -109,9 +116,30 @@ def modqueue_loop(reddit, subreddit):
             if check_for_broken_comment_spoilers(item):
                 continue
 
+            # remove comments from shadowbanned users and leave a comment for those users.
+            if remove_shadowbanned_comments(item):
+                continue
+
         # do post loops acttions
         elif item.name[:2] == 't3':
             pass
+
+
+def remove_shadowbanned_comments(comment):
+    try:
+        # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
+        # python checks for the existence of an object instead of just a bool.
+        if comment.banned_by == True:
+            try:
+                print(comment.author.id)
+            except prawcore.exceptions.NotFound:
+                reply = comment.reply(SHADOWBAN_REMOVAL_COMMENT)
+                reply.mod.distinguish(how='yes')
+                comment.mod.remove(mod_note="Shadowbanned account")
+                return True
+    except AttributeError:
+        return False
+
 
 
 def check_for_sholi_links(comment):
@@ -123,7 +151,7 @@ def check_for_sholi_links(comment):
             return True
         else:
             print("Removing Comment")
-            comment.mod.remove(spam=False)
+            comment.mod.remove(spam=False, mod_note='Sholi link')
             return True
     return False
 
@@ -133,7 +161,7 @@ def check_for_broken_comment_spoilers(comment):
     if broken_spoiler:
         reply = comment.reply(SPOILER_REMOVAL_COMMENT)
         reply.mod.distinguish(how='yes')
-        comment.mod.remove()
+        comment.mod.remove(mod_note="Incorrectly formatted spoiler")
         if spoiler_comment_dict.get(comment.id):
             spoiler_comment_dict[comment.id] = datetime.datetime.now()
         else:
@@ -228,45 +256,45 @@ def run_bot(reddit):
 
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching modqueue...")
-    # for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
-        # print(comment.body)
-        # if comment.author.name == 'AnimemesBot':
-        #     comment.mod.approve()
-        #     continue
-        # if comment.author.name == 'RepostSleuthBot':
-        #     if "I didn't find any posts that meet the matching requirements" in comment.body:
-        #         comment.mod.approve()
-        # has_numbers, has_redaction = check_for_violation(comment.body)
-        # if has_numbers:
-        #     if not has_redaction:
-        #         print("Approving Comment")
-        #         comment.mod.approve()
-        #     else:
-        #         print("Removing Comment")
-        #         comment.mod.remove(spam=False, mod_note='Sholi link')
-        # broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
-        # if broken_spoiler:
-        #     reply = comment.reply(SPOILER_REMOVAL_COMMENT)
-        #     reply.mod.distinguish(how='yes')
-        #     comment.mod.remove(mod_note="Incorrectly formatted spoiler")
-        #     if spoiler_comment_dict.get(comment.id):
-        #         spoiler_comment_dict[comment.id] = datetime.datetime.now()
-        #     else:
-        #         spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
-        #     save_spoiler_dict(spoiler_comment_dict)
+    for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
+        print(comment.body)
+        if comment.author.name == 'AnimemesBot':
+            comment.mod.approve()
+            continue
+        if comment.author.name == 'RepostSleuthBot':
+            if "I didn't find any posts that meet the matching requirements" in comment.body:
+                comment.mod.approve()
+        has_numbers, has_redaction = check_for_violation(comment.body)
+        if has_numbers:
+            if not has_redaction:
+                print("Approving Comment")
+                comment.mod.approve()
+            else:
+                print("Removing Comment")
+                comment.mod.remove(spam=False, mod_note='Sholi link')
+        broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
+        if broken_spoiler:
+            reply = comment.reply(SPOILER_REMOVAL_COMMENT)
+            reply.mod.distinguish(how='yes')
+            comment.mod.remove(mod_note="Incorrectly formatted spoiler")
+            if spoiler_comment_dict.get(comment.id):
+                spoiler_comment_dict[comment.id] = datetime.datetime.now()
+            else:
+                spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
+            save_spoiler_dict(spoiler_comment_dict)
         
-        # try:
-        #     # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
-        #     # python checks for the existence of an object instead of just a bool.
-        #     if comment.banned_by == True:
-                # try:
-                #     print(comment.author.id)
-                # except prawcore.exceptions.NotFound:
-            #         reply = comment.reply(SHADOWBAN_REMOVAL_COMMENT)
-                    # reply.mod.distinguish(how='yes')
-                    # comment.mod.remove(mod_note="Shadowbanned account")
-        # except AttributeError:
-        #     pass
+        try:
+            # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
+            # python checks for the existence of an object instead of just a bool.
+            if comment.banned_by == True:
+                try:
+                    print(comment.author.id)
+                except prawcore.exceptions.NotFound:
+                    reply = comment.reply(SHADOWBAN_REMOVAL_COMMENT)
+                    reply.mod.distinguish(how='yes')
+                    comment.mod.remove(mod_note="Shadowbanned account")
+        except AttributeError:
+            pass
 
 
     print("Checking for improper spoilers")
