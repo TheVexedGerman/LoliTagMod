@@ -1,4 +1,5 @@
 import praw
+import prawcore
 import time
 import requests
 import os
@@ -27,7 +28,9 @@ PARSED_SUBREDDIT = 'Animemes'
 # FLAIR_ID = "094ce764-898a-11e9-b1bf-0e66eeae092c"
 # PARSED_SUBREDDIT = 'loli_tag_bot'
 
-SPOILER_REMOVAL_COMMENT = """Hello Onii-Chan, your comment has been removed for containing a broken spoiler tag.
+COMMENT_FOOTER = "---\n\n*I am a bot, and this action was performed automatically. Please [contact the moderators of this subreddit](https://www.reddit.com/message/compose?to=/r/Animemes) if you have any questions or concerns.*"
+
+SPOILER_REMOVAL_COMMENT = f"""Hello Onii-Chan, your comment has been removed for containing a broken spoiler tag.
 
 A space at the start breaks the tag on some Reddit platforms, you'll have to delete it for the tag to work properly.
 
@@ -41,9 +44,15 @@ Just edit your comment, and if it's fixed, your comment will be put back up.
 
 Thank you for your cooperation.
 
----
+{COMMENT_FOOTER}"""
 
-*I am a bot, and this action was performed automatically. Please [contact the moderators of this subreddit](https://www.reddit.com/message/compose?to=/r/Animemes) if you have any questions or concerns.*"""
+
+SHADOWBAN_REMOVAL_COMMENT = f"""Hello Onii-Chan, your account seems to be shadowbanned.  
+
+This was not an action taken by the /r/Animemes mods, but a site admin for something you were reported for in the past. I'd recommend going to /r/ShadowBan for more information.
+
+{COMMENT_FOOTER}"""
+
 
 def authenticate():
     print("Authenticating...")
@@ -147,7 +156,7 @@ def new_posts_loop(reddit, subreddit):
         check_for_improper_title_spoiler_marks(submission)
 
         # check if the post is nsfw tagged but not spoiler tagged:
-        check_for_nsfw_tagging(submission)
+        # check_for_nsfw_tagging(submission)
 
 def post_new_posts_loop(new_post_list, current_new_post_list, cursor):
     if new_post_list:
@@ -220,10 +229,13 @@ def run_bot(reddit):
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching modqueue...")
     # for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
+        # print(comment.body)
         # if comment.author.name == 'AnimemesBot':
         #     comment.mod.approve()
         #     continue
-        # print(comment.body)
+        # if comment.author.name == 'RepostSleuthBot':
+        #     if "I didn't find any posts that meet the matching requirements" in comment.body:
+        #         comment.mod.approve()
         # has_numbers, has_redaction = check_for_violation(comment.body)
         # if has_numbers:
         #     if not has_redaction:
@@ -231,17 +243,30 @@ def run_bot(reddit):
         #         comment.mod.approve()
         #     else:
         #         print("Removing Comment")
-        #         comment.mod.remove(spam=False)
+        #         comment.mod.remove(spam=False, mod_note='Sholi link')
         # broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
         # if broken_spoiler:
         #     reply = comment.reply(SPOILER_REMOVAL_COMMENT)
         #     reply.mod.distinguish(how='yes')
-        #     comment.mod.remove()
+        #     comment.mod.remove(mod_note="Incorrectly formatted spoiler")
         #     if spoiler_comment_dict.get(comment.id):
         #         spoiler_comment_dict[comment.id] = datetime.datetime.now()
         #     else:
         #         spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
         #     save_spoiler_dict(spoiler_comment_dict)
+        
+        # try:
+        #     # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
+        #     # python checks for the existence of an object instead of just a bool.
+        #     if comment.banned_by == True:
+                # try:
+                #     print(comment.author.id)
+                # except prawcore.exceptions.NotFound:
+            #         reply = comment.reply(SHADOWBAN_REMOVAL_COMMENT)
+                    # reply.mod.distinguish(how='yes')
+                    # comment.mod.remove(mod_note="Shadowbanned account")
+        # except AttributeError:
+        #     pass
 
 
     print("Checking for improper spoilers")
@@ -465,7 +490,7 @@ def approve_old_reposts():
         try:
             # check if there is a template ID (through AttributeError) and if the template ID matches the old repost one
             # if reports.link_flair_template_id == "9a07b400-3c37-11e9-a73e-0e2a828fd580":
-            if reports.link_flair_template_id == "ed044fbe-6b03-11ea-83dc-0e22ffa9e5c3":
+            if "no dignity" in reports.link_flair_text.lower():
                 print(reports.title)
                 approve = True
                 report_dict = make_dict(reports.user_reports)
@@ -743,7 +768,7 @@ def get_awards_dict():
 def generate_awards_css():
     css_string = '\n'
     for key in awards_dict.keys():
-        css_string += f'a.awarding-link[data-award-id={key}]:hover:before {{\n    content: "{awards_dict[key]}";\n}}\n'
+        css_string += f'a.awarding-link[data-award-id$={key[-6:]}]:hover:before {{\n    content: "{awards_dict[key]}";\n}}\n'
     return css_string
 
 
@@ -769,8 +794,11 @@ def load_spoiler_dict():
     if not os.path.isfile("spoiler_comment_dict.json"):
         json_obj = {}
     else:
-        with open("spoiler_comment_dict.json", "r") as f:
-            json_obj = json.loads(f.read(), object_pairs_hook=convert_str_to_datetime)
+        try:
+            with open("spoiler_comment_dict.json", "r") as f:
+                json_obj = json.loads(f.read(), object_pairs_hook=convert_str_to_datetime)
+        except json.decoder.JSONDecodeError:
+            json_obj = {}
     return json_obj
 
 def convert_datetime(date):
