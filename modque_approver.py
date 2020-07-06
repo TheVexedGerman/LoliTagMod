@@ -77,7 +77,7 @@ def main():
     # global cursor2
     # global db_conn2
     db_conn, cursor, db_conn2, cursor2 = authenticate_db()
-    # global watched_id_set
+    global watched_id_set
     watched_id_set = set()
     # global watched_id_report_dict
     watched_id_report_dict = {}
@@ -92,7 +92,7 @@ def main():
         run_bot()
 
 
-def modqueue_loop(reddit, subreddit):
+def modqueue_loop(reddit, subreddit, cursor, db_conn):
     for item in reddit.subreddit(subreddit).mod.modqueue(limit=None):
         # do comment loops actions
         if item.name[:2] == 't1':
@@ -122,7 +122,76 @@ def modqueue_loop(reddit, subreddit):
 
         # do post loops acttions
         elif item.name[:2] == 't3':
-            pass
+            # if it is the weekend approve reaction memes
+            if datetime.datetime.now().weekday() > 4:
+                approve_weekend_reaction_meme_reposts(item)
+
+            # Automatically approve memes reported for reaction meme on the weekend.
+            approve_weekend_reaction_memes(item)
+
+            # Automatically approve memes that got reported for not having a spoiler, but have gotten tagged in the meantime.
+            approve_flagged_but_now_spoiler_tagged_memes(item)
+
+
+def approve_no_dignity_repost_reports(reports, cursor):
+    try:
+        # check if there is a template ID (through AttributeError) and if the template ID matches the old repost one
+        # if reports.link_flair_template_id == "9a07b400-3c37-11e9-a73e-0e2a828fd580":
+        if "no dignity" in reports.link_flair_text.lower():
+            print(reports.title)
+            approve = True
+            report_dict = make_dict(reports.user_reports)
+            for report in reports.user_reports:
+                # if the report contains repost it can be ignored.
+                if "repost" not in report[0].lower():
+                    approve = False
+                    break
+            if not approve and reports.id not in watched_id_set:
+                print("closer check loop")
+                cursor.execute("SELECT reports_json FROM repost_report_check WHERE id = %s", [reports.id])
+                reference_dict = cursor.fetchone()
+                # Make sure an entry exits before assignment, otherwise create empty dict
+                if reference_dict:
+                    reference_dict = reference_dict[0]
+                else:
+                    reference_dict = {}
+                for entry in report_dict:
+                    # ignore repost reports even if they have changed number
+                    if "repost" in entry.lower() and 'http' not in entry.lower():
+                        continue
+                    # compare the entry to the stored one if they don't match set watch and break out of loop
+                    if report_dict.get(entry) != reference_dict.get(entry):
+                        watched_id_set.add(reports.id)
+                        watched_id_report_dict.update({reports.id:report_dict})
+                        update_db(reports.id, report_dict)
+                        print("No approval")
+                        approve = False
+                        break
+                    approve = True
+            # approve the post and go back to the beginning of the loop        
+            if approve:
+                print("Approved")
+                reports.mod.approve()
+                update_db(reports.id, report_dict)
+                continue
+    except AttributeError:
+        pass
+
+
+# TODO integrate into modlog fetch loop
+def update_watched_id_set():
+    if watched_id_set:
+        for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit = 200):
+            if action and action.target_fullname and action.target_fullname[:2] == "t3":
+                if action.target_fullname[3:] in watched_id_set:
+                    cursor.execute("SELECT timestamp FROM repost_report_check WHERE id = %s", [action.target_fullname[3:]])
+                    time = cursor.fetchone()[0]
+                    action_time = datetime.datetime.utcfromtimestamp(action.created_utc)
+                    if time < action_time:
+                        watched_id_set.remove(action.target_fullname[3:])
+                        update_db(action.target_fullname[3:], watched_id_report_dict.pop(action.target_fullname[3:]))
+
+
 
 
 def remove_shadowbanned_comments(comment):
@@ -170,7 +239,7 @@ def check_for_broken_comment_spoilers(comment):
         return True
     return False
 
-def new_posts_loop(reddit, subreddit, cursor):
+def new_posts_loop(reddit, subreddit, cursor, db_conn):
     current_new_post_list = []
     for submission in reddit.subreddit(subreddit).new(limit=100):
         # make a list of current new posts
@@ -179,7 +248,6 @@ def new_posts_loop(reddit, subreddit, cursor):
         # check for spoiler formatted title but no spoiler tag
         if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[contest]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
             submission.report('Possibly missing spoiler tag')
-            continue
 
         # check if the post is spoiler marked but not titled correctly:
         if check_for_improper_title_spoiler_marks(submission):
@@ -187,8 +255,14 @@ def new_posts_loop(reddit, subreddit, cursor):
 
         # check if the post is nsfw tagged but not spoiler tagged:
         # check_for_nsfw_tagging(submission)
+
+        # Check if the image is below the minimum resolution
+        if check_for_minimum_image_size(submission):
+            continue
+
     global new_post_list
     new_post_list = post_new_posts_loop(new_post_list, current_new_post_list, cursor)
+    db_conn.commit()
 
 def post_new_posts_loop(new_post_list, current_new_post_list, cursor):
     if new_post_list:
@@ -218,11 +292,13 @@ def check_for_minimum_image_size(submission):
                     if res['source']['height'] * res['source']['width'] < 100000:
                         submission.mod.remove()
                         submission.flair.select('c87c2ac6-1dd4-11ea-9a24-0ea0ae2c9561', text="Rule 10: Post Quality - Low Res")
+                        return True
             except:
                 print(traceback.format_exc())
     except AttributeError:
         # print(traceback.format_exc())
         print(f"Post {submission.id} has no preview")
+    return False
 
         
 def check_for_nsfw_tagging(submission):
@@ -244,7 +320,7 @@ def check_for_improper_title_spoiler_marks(submission):
                     mod_reports = submission.mod_reports
                 if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
                     submission.report('Spoiler tagged post, improper title format')
-                    return True
+                    return False
             else:
                 print(f"Removing: {submission.title}")
                 submission.mod.remove()
@@ -304,11 +380,11 @@ def run_bot(reddit, cursor, db):
         #     pass
 
 
-    print("Checking for improper spoilers")
-    global new_post_list
-    new_post_list = check_for_improper_spoilers(new_post_list)
-    print("Checking for re-reported reposts")
-    approve_old_reposts()
+    # print("Checking for improper spoilers")
+    # global new_post_list
+    # new_post_list = check_for_improper_spoilers(new_post_list)
+    # print("Checking for re-reported reposts")
+    # approve_old_reposts()
     print("Checking hentaimemes queue comments")
     for comment in reddit2.subreddit('hentaimemes').mod.modqueue(only='comments', limit=None):
         print(comment.body)
@@ -515,66 +591,66 @@ def make_dict(reports):
     return report_dict
 
 
-def approve_old_reposts():
-    for reports in reddit.subreddit(PARSED_SUBREDDIT).mod.reports(only = 'submissions'):
-        if datetime.datetime.now().weekday() > 4:
-            approve_weekend_reaction_meme_reposts(reports)
-        approve_weekend_reaction_memes(reports)
-        approve_flagged_but_now_spoiler_tagged_memes(reports)
+# def approve_old_reposts():
+    # for reports in reddit.subreddit(PARSED_SUBREDDIT).mod.reports(only = 'submissions'):
+    #     if datetime.datetime.now().weekday() > 4:
+    #         approve_weekend_reaction_meme_reposts(reports)
+    #     approve_weekend_reaction_memes(reports)
+    #     approve_flagged_but_now_spoiler_tagged_memes(reports)
         # Why can't I check if link flair exists without trying to get an exception?
-        try:
-            # check if there is a template ID (through AttributeError) and if the template ID matches the old repost one
-            # if reports.link_flair_template_id == "9a07b400-3c37-11e9-a73e-0e2a828fd580":
-            if "no dignity" in reports.link_flair_text.lower():
-                print(reports.title)
-                approve = True
-                report_dict = make_dict(reports.user_reports)
-                for report in reports.user_reports:
-                    # if the report contains repost it can be ignored.
-                    if "repost" not in report[0].lower():
-                        approve = False
-                        break
-                if not approve and reports.id not in watched_id_set:
-                    print("closer check loop")
-                    cursor.execute("SELECT reports_json FROM repost_report_check WHERE id = %s", [reports.id])
-                    reference_dict = cursor.fetchone()
-                    # Make sure an entry exits before assignment, otherwise create empty dict
-                    if reference_dict:
-                        reference_dict = reference_dict[0]
-                    else:
-                        reference_dict = {}
-                    for entry in report_dict:
-                        # ignore repost reports even if they have changed number
-                        if "repost" in entry.lower() and 'http' not in entry.lower():
-                            continue
-                        # compare the entry to the stored one if they don't match set watch and break out of loop
-                        if report_dict.get(entry) != reference_dict.get(entry):
-                            watched_id_set.add(reports.id)
-                            watched_id_report_dict.update({reports.id:report_dict})
-                            update_db(reports.id, report_dict)
-                            print("No approval")
-                            approve = False
-                            break
-                        approve = True
-                # approve the post and go back to the beginning of the loop        
-                if approve:
-                    print("Approved")
-                    reports.mod.approve()
-                    update_db(reports.id, report_dict)
-                    continue
-        except AttributeError:
-            pass
+        # try:
+        #     # check if there is a template ID (through AttributeError) and if the template ID matches the old repost one
+        #     # if reports.link_flair_template_id == "9a07b400-3c37-11e9-a73e-0e2a828fd580":
+        #     if "no dignity" in reports.link_flair_text.lower():
+        #         print(reports.title)
+        #         approve = True
+        #         report_dict = make_dict(reports.user_reports)
+        #         for report in reports.user_reports:
+        #             # if the report contains repost it can be ignored.
+        #             if "repost" not in report[0].lower():
+        #                 approve = False
+        #                 break
+        #         if not approve and reports.id not in watched_id_set:
+        #             print("closer check loop")
+        #             cursor.execute("SELECT reports_json FROM repost_report_check WHERE id = %s", [reports.id])
+        #             reference_dict = cursor.fetchone()
+        #             # Make sure an entry exits before assignment, otherwise create empty dict
+        #             if reference_dict:
+        #                 reference_dict = reference_dict[0]
+        #             else:
+        #                 reference_dict = {}
+        #             for entry in report_dict:
+        #                 # ignore repost reports even if they have changed number
+        #                 if "repost" in entry.lower() and 'http' not in entry.lower():
+        #                     continue
+        #                 # compare the entry to the stored one if they don't match set watch and break out of loop
+        #                 if report_dict.get(entry) != reference_dict.get(entry):
+        #                     watched_id_set.add(reports.id)
+        #                     watched_id_report_dict.update({reports.id:report_dict})
+        #                     update_db(reports.id, report_dict)
+        #                     print("No approval")
+        #                     approve = False
+        #                     break
+        #                 approve = True
+        #         # approve the post and go back to the beginning of the loop        
+        #         if approve:
+        #             print("Approved")
+        #             reports.mod.approve()
+        #             update_db(reports.id, report_dict)
+        #             continue
+        # except AttributeError:
+        #     pass
     # Check modlog for approvals of previously marked posts.
-    if watched_id_set:
-        for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit = 200):
-            if action and action.target_fullname and action.target_fullname[:2] == "t3":
-                if action.target_fullname[3:] in watched_id_set:
-                    cursor.execute("SELECT timestamp FROM repost_report_check WHERE id = %s", [action.target_fullname[3:]])
-                    time = cursor.fetchone()[0]
-                    action_time = datetime.datetime.utcfromtimestamp(action.created_utc)
-                    if time < action_time:
-                        watched_id_set.remove(action.target_fullname[3:])
-                        update_db(action.target_fullname[3:], watched_id_report_dict.pop(action.target_fullname[3:]))
+    # if watched_id_set:
+    #     for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit = 200):
+    #         if action and action.target_fullname and action.target_fullname[:2] == "t3":
+    #             if action.target_fullname[3:] in watched_id_set:
+    #                 cursor.execute("SELECT timestamp FROM repost_report_check WHERE id = %s", [action.target_fullname[3:]])
+    #                 time = cursor.fetchone()[0]
+    #                 action_time = datetime.datetime.utcfromtimestamp(action.created_utc)
+    #                 if time < action_time:
+    #                     watched_id_set.remove(action.target_fullname[3:])
+    #                     update_db(action.target_fullname[3:], watched_id_report_dict.pop(action.target_fullname[3:]))
 
 
 def approve_flagged_but_now_spoiler_tagged_memes(reports):
