@@ -170,7 +170,7 @@ def check_for_broken_comment_spoilers(comment):
         return True
     return False
 
-def new_posts_loop(reddit, subreddit):
+def new_posts_loop(reddit, subreddit, cursor):
     current_new_post_list = []
     for submission in reddit.subreddit(subreddit).new(limit=100):
         # make a list of current new posts
@@ -179,12 +179,16 @@ def new_posts_loop(reddit, subreddit):
         # check for spoiler formatted title but no spoiler tag
         if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[contest]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
             submission.report('Possibly missing spoiler tag')
+            continue
 
         # check if the post is spoiler marked but not titled correctly:
-        check_for_improper_title_spoiler_marks(submission)
+        if check_for_improper_title_spoiler_marks(submission):
+            continue
 
         # check if the post is nsfw tagged but not spoiler tagged:
         # check_for_nsfw_tagging(submission)
+    global new_post_list
+    new_post_list = post_new_posts_loop(new_post_list, current_new_post_list, cursor)
 
 def post_new_posts_loop(new_post_list, current_new_post_list, cursor):
     if new_post_list:
@@ -240,61 +244,64 @@ def check_for_improper_title_spoiler_marks(submission):
                     mod_reports = submission.mod_reports
                 if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
                     submission.report('Spoiler tagged post, improper title format')
+                    return True
             else:
                 print(f"Removing: {submission.title}")
                 submission.mod.remove()
                 # improperly marked spoiler flair
                 submission.flair.select("094ce764-898a-11e9-b1bf-0e66eeae092c")
+                return True
+    return False
 
 
-def run_bot(reddit):
+def run_bot(reddit, cursor, db):
     # modqueue loop
     modqueue_loop(reddit, "Animemes")
     # new posts loop
-    new_posts_loop(reddit, "Animemes")
+    new_posts_loop(reddit, "Animemes", cursor, db)
 
 
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching modqueue...")
-    for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
-        print(comment.body)
-        if comment.author.name == 'AnimemesBot':
-            comment.mod.approve()
-            continue
-        if comment.author.name == 'RepostSleuthBot':
-            if "I didn't find any posts that meet the matching requirements" in comment.body:
-                comment.mod.approve()
-        has_numbers, has_redaction = check_for_violation(comment.body)
-        if has_numbers:
-            if not has_redaction:
-                print("Approving Comment")
-                comment.mod.approve()
-            else:
-                print("Removing Comment")
-                comment.mod.remove(spam=False, mod_note='Sholi link')
-        broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
-        if broken_spoiler:
-            reply = comment.reply(SPOILER_REMOVAL_COMMENT)
-            reply.mod.distinguish(how='yes')
-            comment.mod.remove(mod_note="Incorrectly formatted spoiler")
-            if spoiler_comment_dict.get(comment.id):
-                spoiler_comment_dict[comment.id] = datetime.datetime.now()
-            else:
-                spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
-            save_spoiler_dict(spoiler_comment_dict)
+    # for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
+    #     print(comment.body)
+    #     if comment.author.name == 'AnimemesBot':
+    #         comment.mod.approve()
+    #         continue
+    #     if comment.author.name == 'RepostSleuthBot':
+    #         if "I didn't find any posts that meet the matching requirements" in comment.body:
+    #             comment.mod.approve()
+    #     has_numbers, has_redaction = check_for_violation(comment.body)
+    #     if has_numbers:
+    #         if not has_redaction:
+    #             print("Approving Comment")
+    #             comment.mod.approve()
+    #         else:
+    #             print("Removing Comment")
+    #             comment.mod.remove(spam=False, mod_note='Sholi link')
+    #     broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
+    #     if broken_spoiler:
+    #         reply = comment.reply(SPOILER_REMOVAL_COMMENT)
+    #         reply.mod.distinguish(how='yes')
+    #         comment.mod.remove(mod_note="Incorrectly formatted spoiler")
+    #         if spoiler_comment_dict.get(comment.id):
+    #             spoiler_comment_dict[comment.id] = datetime.datetime.now()
+    #         else:
+    #             spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
+    #         save_spoiler_dict(spoiler_comment_dict)
         
-        try:
-            # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
-            # python checks for the existence of an object instead of just a bool.
-            if comment.banned_by == True:
-                try:
-                    print(comment.author.id)
-                except prawcore.exceptions.NotFound:
-                    reply = comment.reply(SHADOWBAN_REMOVAL_COMMENT)
-                    reply.mod.distinguish(how='yes')
-                    comment.mod.remove(mod_note="Shadowbanned account")
-        except AttributeError:
-            pass
+        # try:
+        #     # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
+        #     # python checks for the existence of an object instead of just a bool.
+        #     if comment.banned_by == True:
+        #         try:
+        #             print(comment.author.id)
+        #         except prawcore.exceptions.NotFound:
+        #             reply = comment.reply(SHADOWBAN_REMOVAL_COMMENT)
+        #             reply.mod.distinguish(how='yes')
+        #             comment.mod.remove(mod_note="Shadowbanned account")
+        # except AttributeError:
+        #     pass
 
 
     print("Checking for improper spoilers")
