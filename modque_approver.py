@@ -82,14 +82,14 @@ def main():
     global watched_id_report_dict
     watched_id_report_dict = {}
     global awards_dict
-    awards_dict = get_awards_dict()
+    awards_dict = get_awards_dict(cursor)
     # Initialize the dictionary for spoiler comments which have been formatted incorrectly
     global spoiler_comment_dict
     spoiler_comment_dict = load_spoiler_dict()
 
     # run_bot()
     while True:
-        run_bot()
+        run_bot(reddit, cursor, db_conn)
 
 
 def modqueue_loop(reddit, subreddit, cursor, db_conn):
@@ -124,10 +124,10 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
         elif item.name[:2] == 't3':
             # if it is the weekend approve reaction memes
             if datetime.datetime.now().weekday() > 4:
-                approve_weekend_reaction_meme_reposts(item)
+                approve_weekend_reaction_meme_reposts(item, cursor, db_conn)
 
             # Automatically approve memes reported for reaction meme on the weekend.
-            approve_weekend_reaction_memes(item)
+            approve_weekend_reaction_memes(item, cursor, db_conn)
 
             # Automatically approve memes that got reported for not having a spoiler, but have gotten tagged in the meantime.
             approve_flagged_but_now_spoiler_tagged_memes(item)
@@ -135,7 +135,7 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
 
 def modlog_loop(reddit, subreddit, cursor, db_conn):
     for action in reddit.subreddit(subreddit).mod.log(limit=None):
-        update_watched_id_set(action, cursor)
+        update_watched_id_set(action, cursor, db_conn)
         cursor.execute("SELECT * FROM modlog WHERE id = %s", [action.id])
         exists = cursor.fetchone()
         if exists:
@@ -143,7 +143,7 @@ def modlog_loop(reddit, subreddit, cursor, db_conn):
         cursor.execute("INSERT INTO modlog (action, created_utc, description, details, id, mod, mod_id36, sr_id36, subreddit, subreddit_name_prefixed, target_author, target_body, target_fullname, target_permalink, target_title) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (action.action, convert_time(action.created_utc), action.description, action.details, action.id, str(action.mod), action.mod_id36, action.sr_id36, action.subreddit, action.subreddit_name_prefixed, str(action.target_author), action.target_body, action.target_fullname, action.target_permalink, action.target_title))
         db_conn.commit()
 
-def update_watched_id_set(action, cursor):
+def update_watched_id_set(action, cursor, db_conn):
     if watched_id_set:
         if action and action.target_fullname and action.target_fullname[:2] == "t3":
             if action.target_fullname[3:] in watched_id_set:
@@ -152,7 +152,7 @@ def update_watched_id_set(action, cursor):
                 action_time = datetime.datetime.utcfromtimestamp(action.created_utc)
                 if time < action_time:
                     watched_id_set.remove(action.target_fullname[3:])
-                    update_db(action.target_fullname[3:], watched_id_report_dict.pop(action.target_fullname[3:]))
+                    update_db(action.target_fullname[3:], watched_id_report_dict.pop(action.target_fullname[3:]), cursor, db_conn)
 
 
 def update_flairs_in_the_db(reddit, cursor, db_conn):
@@ -189,7 +189,7 @@ def event_removal_db_update(removal_suspect, cursor):
             cursor.execute("INSERT INTO event_removals (id, created_utc, mod, target_id, event) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (ID) DO NOTHING", (log_entry[0], log_entry[1], log_entry[2], removal_suspect.id, "NSFW Spoiler"))
 
 
-def approve_no_dignity_repost_reports(reports, cursor):
+def approve_no_dignity_repost_reports(reports, cursor, db_conn):
     try:
         # check if there is a template ID (through AttributeError) and if the template ID matches the old repost one
         # if reports.link_flair_template_id == "9a07b400-3c37-11e9-a73e-0e2a828fd580":
@@ -219,7 +219,7 @@ def approve_no_dignity_repost_reports(reports, cursor):
                     if report_dict.get(entry) != reference_dict.get(entry):
                         watched_id_set.add(reports.id)
                         watched_id_report_dict.update({reports.id:report_dict})
-                        update_db(reports.id, report_dict)
+                        update_db(reports.id, report_dict, cursor, db_conn)
                         print("No approval")
                         approve = False
                         break
@@ -228,8 +228,8 @@ def approve_no_dignity_repost_reports(reports, cursor):
             if approve:
                 print("Approved")
                 reports.mod.approve()
-                update_db(reports.id, report_dict)
-                continue
+                update_db(reports.id, report_dict, cursor, db_conn)
+                return
     except AttributeError:
         pass
 
@@ -398,6 +398,7 @@ def check_for_improper_title_spoiler_marks(submission):
 
 
 def run_bot(reddit, cursor, db_conn):
+    #TODO hentaimemes part.
     print("Current time: " + str(datetime.datetime.now().time()))
     # modqueue loop
     print("Fetching modqueue...")
@@ -444,7 +445,7 @@ def run_bot(reddit, cursor, db_conn):
     
     print("Checking for edited broken spoiler comments")
     # possible rewrite to account for the edited comment loop.
-    check_for_updated_comments()
+    check_for_updated_comments(reddit)
     print("Sleeping for 30 seconds...")
     time.sleep(30)
 
@@ -489,100 +490,6 @@ def get_offset(new, old):
         return new.index(old[0])
     except ValueError:
         return get_offset(new, old[1:])
-
-
-# def check_for_improper_spoilers(new_post_list):
-#     current_new_post_list = []
-#     ignore_list = []
-#     cursor.execute("SELECT id FROM sachimod_ignore_posts WHERE created_utc > %s", (datetime.datetime.now()-datetime.timedelta(days=1),))
-#     stored_ignore = cursor.fetchall()
-#     if stored_ignore:
-#         ignore_list = [entry[0] for entry in stored_ignore]
-#     for submission in reddit.subreddit(PARSED_SUBREDDIT).new(limit=100):
-#         # check for missing sources
-#         # if convert_time(submission.created_utc) < (datetime.datetime.now() - datetime.timedelta(minutes=30)):
-#         #     if '[multiple]' in submission.title.lower():
-#         #         cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (f"t3_{submission.id}", str(submission.author)))
-#         #         tlc = cursor.fetchall()
-#         #         if len(tlc) == 0:
-#         #             cursor.execute("SELECT id FROM comments WHERE parent_id = %s AND author = %s", (f"t3_{submission.id}", "AutoModerator"))
-#         #             automod = cursor.fetchone()
-#         #             cursor.execute("SELECT author FROM comments WHERE parent_id = %s AND author = %s", (f"t1_{automod[0]}", str(submission.author)))
-#         #             op = cursor.fetchall()
-#         #             if len(op) == 0:
-#         #                 try:
-#         #                     mod_reports = submission.mod_reports + submission.mod_reports_dismissed
-#         #                 except AttributeError:
-#         #                     mod_reports = submission.mod_reports
-#         #                 if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
-#         #                     if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
-#         #                         submission.report('No source comment detected after 30 min.')
-                
-
-#         # check for spoiler formatted title but no spoiler tag
-#         if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler and '[contest]' not in submission.title.lower():
-#             submission.report('Possibly missing spoiler tag')
-#         # check for spoiler tag byt not properly formatted title
-#         if submission.spoiler:
-#             # check title for spoiler formatting
-#             match = re.search(r"\[.+?\]", submission.title)
-#             if not match:
-#                 if 'spoiler' in submission.title.lower():
-#                     try:
-#                         mod_reports = submission.mod_reports + submission.mod_reports_dismissed
-#                     except AttributeError:
-#                         mod_reports = submission.mod_reports
-#                     if not any(mod_report[1] == "SachiMod" for mod_report in mod_reports):
-#                         submission.report('Spoiler tagged post, improper title format')
-#                 else:
-#                     print(f"Removing: {submission.title}")
-#                     submission.mod.remove()
-#                     # improperly marked spoiler flair
-#                     submission.flair.select(FLAIR_ID)
-#         # remove low resolution images
-
-#         # check for nsfw tagging
-#         if submission.over_18:
-#             if '[nsfw]' not in submission.title.lower():
-#                 submission.mod.remove()
-#                 submission.flair.select('eeaebb92-8b38-11ea-a432-0e232b3ed13d')
-
-#         if submission.id not in ignore_list:
-#             try:
-#                 if submission.preview:
-#                     try:
-#                         if submission.preview.get('images'):
-#                             res = submission.preview['images'][0]
-#                             if res['source']['height'] * res['source']['width'] < 100000:
-#                                 submission.mod.remove()
-#                                 submission.flair.select('c87c2ac6-1dd4-11ea-9a24-0ea0ae2c9561', text="Rule 10: Post Quality - Low Res")
-#                     except:
-#                         print(traceback.format_exc())
-#             except AttributeError:
-#                 # print(traceback.format_exc())
-#                 print(f"Post {submission.id} has no preview")
-#         #create a list of ids currently in new
-#         current_new_post_list.append(submission.id)
-
-#     # make sure there is a previous list
-#     print(new_post_list)
-#     if new_post_list:
-#         # determine the offset between the old and the new list
-#         offset = get_offset(current_new_post_list, new_post_list)
-#         for i, entry in enumerate(new_post_list):
-#             # exit if the end of new list has been reached.
-#             if i + offset >= len(current_new_post_list):
-#                 break
-#             else:
-#                 # improve this so it doesn't automatically go to the next entry.
-#                 # check if the ids are identical
-#                 if entry != current_new_post_list[i+offset]:
-#                     print(f"{submission.id}: {submission.created_utc} was removed")
-#                     cursor.execute("UPDATE posts SET estimated_deletion_time = %s WHERE id = %s", (datetime.datetime.now(), entry))
-#                     # move the offset one back because the new list is now missing one entry.
-#                     offset += -1
-#     # set the new list to be the one checked next time
-#     return current_new_post_list
         
 
 def check_for_improper_urls(comment):
@@ -610,7 +517,7 @@ def authenticate_db():
     return db_conn, db_conn.cursor(), db_conn2, db_conn2.cursor()
 
 
-def update_db(post_id, reports_dict):
+def update_db(post_id, reports_dict, cursor, db_conn):
     cursor.execute("SELECT * FROM repost_report_check WHERE id = %s", [post_id])
     entry_exists = cursor.fetchone()
     if entry_exists:
@@ -627,68 +534,6 @@ def make_dict(reports):
     return report_dict
 
 
-# def approve_old_reposts():
-    # for reports in reddit.subreddit(PARSED_SUBREDDIT).mod.reports(only = 'submissions'):
-    #     if datetime.datetime.now().weekday() > 4:
-    #         approve_weekend_reaction_meme_reposts(reports)
-    #     approve_weekend_reaction_memes(reports)
-    #     approve_flagged_but_now_spoiler_tagged_memes(reports)
-        # Why can't I check if link flair exists without trying to get an exception?
-        # try:
-        #     # check if there is a template ID (through AttributeError) and if the template ID matches the old repost one
-        #     # if reports.link_flair_template_id == "9a07b400-3c37-11e9-a73e-0e2a828fd580":
-        #     if "no dignity" in reports.link_flair_text.lower():
-        #         print(reports.title)
-        #         approve = True
-        #         report_dict = make_dict(reports.user_reports)
-        #         for report in reports.user_reports:
-        #             # if the report contains repost it can be ignored.
-        #             if "repost" not in report[0].lower():
-        #                 approve = False
-        #                 break
-        #         if not approve and reports.id not in watched_id_set:
-        #             print("closer check loop")
-        #             cursor.execute("SELECT reports_json FROM repost_report_check WHERE id = %s", [reports.id])
-        #             reference_dict = cursor.fetchone()
-        #             # Make sure an entry exits before assignment, otherwise create empty dict
-        #             if reference_dict:
-        #                 reference_dict = reference_dict[0]
-        #             else:
-        #                 reference_dict = {}
-        #             for entry in report_dict:
-        #                 # ignore repost reports even if they have changed number
-        #                 if "repost" in entry.lower() and 'http' not in entry.lower():
-        #                     continue
-        #                 # compare the entry to the stored one if they don't match set watch and break out of loop
-        #                 if report_dict.get(entry) != reference_dict.get(entry):
-        #                     watched_id_set.add(reports.id)
-        #                     watched_id_report_dict.update({reports.id:report_dict})
-        #                     update_db(reports.id, report_dict)
-        #                     print("No approval")
-        #                     approve = False
-        #                     break
-        #                 approve = True
-        #         # approve the post and go back to the beginning of the loop        
-        #         if approve:
-        #             print("Approved")
-        #             reports.mod.approve()
-        #             update_db(reports.id, report_dict)
-        #             continue
-        # except AttributeError:
-        #     pass
-    # Check modlog for approvals of previously marked posts.
-    # if watched_id_set:
-    #     for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit = 200):
-    #         if action and action.target_fullname and action.target_fullname[:2] == "t3":
-    #             if action.target_fullname[3:] in watched_id_set:
-    #                 cursor.execute("SELECT timestamp FROM repost_report_check WHERE id = %s", [action.target_fullname[3:]])
-    #                 time = cursor.fetchone()[0]
-    #                 action_time = datetime.datetime.utcfromtimestamp(action.created_utc)
-    #                 if time < action_time:
-    #                     watched_id_set.remove(action.target_fullname[3:])
-    #                     update_db(action.target_fullname[3:], watched_id_report_dict.pop(action.target_fullname[3:]))
-
-
 def approve_flagged_but_now_spoiler_tagged_memes(reports):
     if not reports.mod_reports:
         return
@@ -701,7 +546,7 @@ def approve_flagged_but_now_spoiler_tagged_memes(reports):
         if reports.spoiler:
             reports.mod.approve()
 
-def approve_weekend_reaction_meme_reposts(reports):
+def approve_weekend_reaction_meme_reposts(reports, reddit, cursor):
     if not reports.mod_reports:
         return
     if reports.user_reports:
@@ -724,7 +569,7 @@ def approve_weekend_reaction_meme_reposts(reports):
                     continue
 
 
-def approve_weekend_reaction_memes(reports):
+def approve_weekend_reaction_memes(reports, cursor, db_conn):
     print(reports.title)
     approve = True
     is_reaction = False
@@ -756,7 +601,7 @@ def approve_weekend_reaction_memes(reports):
             if report_dict.get(entry) != reference_dict.get(entry):
                 watched_id_set.add(reports.id)
                 watched_id_report_dict.update({reports.id:report_dict})
-                update_db(reports.id, report_dict)
+                update_db(reports.id, report_dict, cursor, db_conn)
                 print("No approval")
                 approve = False
                 break
@@ -764,24 +609,7 @@ def approve_weekend_reaction_memes(reports):
         # approve the post and go back to the beginning of the loop        
     if approve and is_reaction:
         reports.mod.approve()
-        update_db(reports.id, report_dict)
-
-
-# def grab_modlog():
-    # for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit=None):
-    #     cursor.execute("SELECT * FROM modlog WHERE id = %s", [action.id])
-    #     exists = cursor.fetchone()
-    #     if exists:
-    #         break
-    #     cursor.execute("INSERT INTO modlog (action, created_utc, description, details, id, mod, mod_id36, sr_id36, subreddit, subreddit_name_prefixed, target_author, target_body, target_fullname, target_permalink, target_title) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (action.action, convert_time(action.created_utc), action.description, action.details, action.id, str(action.mod), action.mod_id36, action.sr_id36, action.subreddit, action.subreddit_name_prefixed, str(action.target_author), action.target_body, action.target_fullname, action.target_permalink, action.target_title))
-    #     db_conn.commit()
-    # for action in reddit2.subreddit("hentaimemes").mod.log(limit=None):
-    #     cursor2.execute("SELECT * FROM modlog WHERE id = %s", [action.id])
-    #     exists = cursor2.fetchone()
-    #     if exists:
-    #         break
-    #     cursor2.execute("INSERT INTO modlog (action, created_utc, description, details, id, mod, mod_id36, sr_id36, subreddit, subreddit_name_prefixed, target_author, target_body, target_fullname, target_permalink, target_title) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (action.action, convert_time(action.created_utc), action.description, action.details, action.id, str(action.mod), action.mod_id36, action.sr_id36, action.subreddit, action.subreddit_name_prefixed, str(action.target_author), action.target_body, action.target_fullname, action.target_permalink, action.target_title))
-    #     db_conn2.commit()
+        update_db(reports.id, report_dict, cursor, db_conn)
 
 
 def convert_time(time):
@@ -789,59 +617,8 @@ def convert_time(time):
         return datetime.datetime.utcfromtimestamp(time)
     return None
 
-# def ban_for_reposts():
-#     # # Grab flair edits from modlog
-#     # cursor.execute("SELECT id, target_fullname FROM modlog WHERE action = 'editflair' and ban_processing = false ORDER BY created_utc DESC LIMIT 100")
-#     # edit_flair_list = cursor.fetchall()
-#     # check_ids = []
-#     # # add all the fullnames into a list
-#     # for edited_flair in edit_flair_list:
-#     #     if edited_flair[1]:
-#     #         check_ids.append(edited_flair[1])
-#     # # Fetch them all from reddit
-#     # if check_ids:
-#     #     for removal_suspect in reddit.info(fullnames=check_ids):
-#     #         # # check that it was posted in november
-#     #         # if convert_time(removal_suspect.created_utc) > datetime.datetime(2019, 12, 1):
-#     #         #     continue
-#     #         # check if they have the right flair
-#     #         try:
-#     #             if removal_suspect.link_flair_template_id:
-#     #                 pass
-#     #         except AttributeError:
-#     #             continue
-#     #         cursor.execute("UPDATE posts SET link_flair_template_id = %s, link_flair_text = %s WHERE id = %s", (removal_suspect.link_flair_template_id, removal_suspect.link_flair_text, removal_suspect.id))
-#     #     #     if removal_suspect.link_flair_template_id == 'e186588a-fcc7-11e9-8108-0e38adec5b54':
-#     #     #         # check if they have actually been removed
-#     #     #         cursor.execute("SELECT id, action, target_author FROM modlog WHERE target_fullname = %s AND NOT action = 'editflair' ORDER BY created_utc DESC", (removal_suspect.name,))
-#     #     #         current_state = cursor.fetchone()
-#     #     #         if current_state and current_state[1] == 'removelink':
-#     #     #             # ban the user
-#     #     #             cursor.execute("SELECT id, created_utc FROM modlog WHERE target_author = %s AND mod = 'SachiMod' AND action = 'banuser' ORDER BY created_utc DESC", (current_state[2],))
-#     #     #             previous_violations = cursor.fetchall()
-#     #     #             if previous_violations:
-#     #     #                 if len(previous_violations) == 1 and (datetime.datetime.now() - previous_violations[0][1] > datetime.timedelta(days=3)):
-#     #     #                     ban_user(current_state[2], duration=7, note=f"2nd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Looks like the first ban did not drive the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) home. Maybe this will. See you in a week.\n\nThis is your last warning before being banned for the rest of the month. Make sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.')
-#     #     #                     print(f"User: {current_state[2]} banned for the 2nd time")
-#     #     #                 elif len(previous_violations) == 2 and (datetime.datetime.now() - previous_violations[0][1] > datetime.timedelta(days=7)):
-#     #     #                     ban_user(current_state[2], duration=21, note=f"3rd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Since the previous two bans did not manage to explain that we really mean it with ["No Reposts" during "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/), you can just chill until December.')
-#     #     #                     print(f"User: {current_state[2]} banned for the 3rd time")
-#     #     #             else:
-#     #     #                 ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
-#     #     #                 print(f"User: {current_state[2]} banned")
 
-#         # event removal processing
-#             # if removal_suspect.link_flair_template_id == 'eeaebb92-8b38-11ea-a432-0e232b3ed13d':
-#             #     cursor.execute("SELECT id, created_utc, mod FROM modlog WHERE target_fullname = %s AND action = 'removelink' ORDER BY created_utc DESC", (removal_suspect.name,))
-#             #     log_entry = cursor.fetchone()
-#             #     if log_entry:
-#             #         cursor.execute("INSERT INTO event_removals (id, created_utc, mod, target_id, event) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (ID) DO NOTHING", (log_entry[0], log_entry[1], log_entry[2], removal_suspect.id, "NSFW Spoiler"))
-#         for entry in edit_flair_list:
-#             cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
-#         db_conn.commit()
-
-
-def ban_user(user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone did not understand the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) and should have some sense [smacked into them](https://i.imgur.com/4VsscZB.png). See you in three days\n\nMake sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.', duration = 3, note = "Automated ban for reposting a meme"):
+def ban_user(reddit, user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone did not understand the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) and should have some sense [smacked into them](https://i.imgur.com/4VsscZB.png). See you in three days\n\nMake sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.', duration = 3, note = "Automated ban for reposting a meme"):
     reddit.subreddit(PARSED_SUBREDDIT).banned.add(user, ban_reason=ban_reason, ban_message=ban_message, duration=duration, note=note)
 
 
@@ -858,52 +635,14 @@ def modmail_fetcher(reddit, subreddit, cursor, db_conn):
         db_conn.commit()
 
 
-# def awards_updater():
-#     # print(awards_dict)
-#     for post in reddit.subreddit(PARSED_SUBREDDIT).gilded(limit=100):
-#         try:
-#             if post.all_awardings:
-#                 pass
-#         except:
-#             continue
-#         for award in post.all_awardings:
-#             if not check_awards_membership(award):
-#                 cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
-#                 db_conn.commit()
-#                 awards_dict.update({award['id']: award['name']})
-#                 sub = reddit.subreddit(PARSED_SUBREDDIT)
-#                 stylesheet = sub.stylesheet().stylesheet
-#                 awards_css = generate_awards_css()
-#                 stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
-#                 sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
-#     for post in reddit.subreddit(PARSED_SUBREDDIT).hot(limit=100):
-#         try:
-#             if post.all_awardings:
-#                 pass
-#         except:
-#             continue
-#         for award in post.all_awardings:
-#             if not check_awards_membership(award):
-#                 cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
-#                 db_conn.commit()
-#                 awards_dict.update({award['id']: award['name']})
-#                 sub = reddit.subreddit(PARSED_SUBREDDIT)
-#                 stylesheet = sub.stylesheet().stylesheet
-#                 awards_css = generate_awards_css()
-#                 stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
-#                 sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
-
-
 def check_awards_membership(award):
     # just try to see if the key is in the dict
-    # for key in awards_dict.keys():
-    #     if key == award['id']:
     if awards_dict.get(award['id']):
         return True
     return False
 
 
-def get_awards_dict():
+def get_awards_dict(cursor):
     dic = {}
     cursor.execute("SELECT id, name FROM awards")
     awards = cursor.fetchall()
@@ -964,7 +703,7 @@ def convert_str_to_datetime(pairs):
             dic[key] = value            
     return dic
 
-def check_for_updated_comments():
+def check_for_updated_comments(reddit):
     # Check recent comments because ninja edits don't show up in the edited page.
     for comment_id in list(spoiler_comment_dict.keys()):
         if spoiler_comment_dict[comment_id] + datetime.timedelta(minutes=3) < datetime.datetime.now():
