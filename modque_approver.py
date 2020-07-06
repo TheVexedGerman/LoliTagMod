@@ -79,9 +79,9 @@ def main():
     db_conn, cursor, db_conn2, cursor2 = authenticate_db()
     global watched_id_set
     watched_id_set = set()
-    # global watched_id_report_dict
+    global watched_id_report_dict
     watched_id_report_dict = {}
-    # global awards_dict
+    global awards_dict
     awards_dict = get_awards_dict()
     # Initialize the dictionary for spoiler comments which have been formatted incorrectly
     global spoiler_comment_dict
@@ -133,6 +133,62 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
             approve_flagged_but_now_spoiler_tagged_memes(item)
 
 
+def modlog_loop(reddit, subreddit, cursor, db_conn):
+    for action in reddit.subreddit(subreddit).mod.log(limit=None):
+        update_watched_id_set(action, cursor)
+        cursor.execute("SELECT * FROM modlog WHERE id = %s", [action.id])
+        exists = cursor.fetchone()
+        if exists:
+            break
+        cursor.execute("INSERT INTO modlog (action, created_utc, description, details, id, mod, mod_id36, sr_id36, subreddit, subreddit_name_prefixed, target_author, target_body, target_fullname, target_permalink, target_title) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (action.action, convert_time(action.created_utc), action.description, action.details, action.id, str(action.mod), action.mod_id36, action.sr_id36, action.subreddit, action.subreddit_name_prefixed, str(action.target_author), action.target_body, action.target_fullname, action.target_permalink, action.target_title))
+        db_conn.commit()
+
+def update_watched_id_set(action, cursor):
+    if watched_id_set:
+        if action and action.target_fullname and action.target_fullname[:2] == "t3":
+            if action.target_fullname[3:] in watched_id_set:
+                cursor.execute("SELECT timestamp FROM repost_report_check WHERE id = %s", [action.target_fullname[3:]])
+                time = cursor.fetchone()[0]
+                action_time = datetime.datetime.utcfromtimestamp(action.created_utc)
+                if time < action_time:
+                    watched_id_set.remove(action.target_fullname[3:])
+                    update_db(action.target_fullname[3:], watched_id_report_dict.pop(action.target_fullname[3:]))
+
+
+def update_flairs_in_the_db(reddit, cursor, db_conn):
+    cursor.execute("SELECT id, target_fullname FROM modlog WHERE action = 'editflair' and ban_processing = false ORDER BY created_utc DESC LIMIT 100")
+    edit_flair_list = cursor.fetchall()
+    check_ids = []
+    # add all the fullnames into a list
+    for edited_flair in edit_flair_list:
+        if edited_flair[1]:
+            check_ids.append(edited_flair[1])
+    # Fetch them all from reddit
+    if check_ids:
+        for removal_suspect in reddit.info(fullnames=check_ids):
+            try:
+                if removal_suspect.link_flair_template_id:
+                    pass
+            except AttributeError:
+                continue
+            cursor.execute("UPDATE posts SET link_flair_template_id = %s, link_flair_text = %s WHERE id = %s", (removal_suspect.link_flair_template_id, removal_suspect.link_flair_text, removal_suspect.id))
+            # Feed the event removals mirror db
+            event_removal_db_update(removal_suspect, cursor)
+        for entry in edit_flair_list:
+            cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
+        db_conn.commit()
+
+
+def event_removal_db_update(removal_suspect, cursor):
+    # Event removal flair ID
+    if removal_suspect.link_flair_template_id == 'eeaebb92-8b38-11ea-a432-0e232b3ed13d':
+        cursor.execute("SELECT id, created_utc, mod FROM modlog WHERE target_fullname = %s AND action = 'removelink' ORDER BY created_utc DESC", (removal_suspect.name,))
+        log_entry = cursor.fetchone()
+        if log_entry:
+            # event needs to be fed with the event name so it shows up properly
+            cursor.execute("INSERT INTO event_removals (id, created_utc, mod, target_id, event) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (ID) DO NOTHING", (log_entry[0], log_entry[1], log_entry[2], removal_suspect.id, "NSFW Spoiler"))
+
+
 def approve_no_dignity_repost_reports(reports, cursor):
     try:
         # check if there is a template ID (through AttributeError) and if the template ID matches the old repost one
@@ -176,22 +232,6 @@ def approve_no_dignity_repost_reports(reports, cursor):
                 continue
     except AttributeError:
         pass
-
-
-# TODO integrate into modlog fetch loop
-def update_watched_id_set():
-    if watched_id_set:
-        for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit = 200):
-            if action and action.target_fullname and action.target_fullname[:2] == "t3":
-                if action.target_fullname[3:] in watched_id_set:
-                    cursor.execute("SELECT timestamp FROM repost_report_check WHERE id = %s", [action.target_fullname[3:]])
-                    time = cursor.fetchone()[0]
-                    action_time = datetime.datetime.utcfromtimestamp(action.created_utc)
-                    if time < action_time:
-                        watched_id_set.remove(action.target_fullname[3:])
-                        update_db(action.target_fullname[3:], watched_id_report_dict.pop(action.target_fullname[3:]))
-
-
 
 
 def remove_shadowbanned_comments(comment):
@@ -238,6 +278,33 @@ def check_for_broken_comment_spoilers(comment):
         save_spoiler_dict(spoiler_comment_dict)
         return True
     return False
+
+def gilded_posts_loop(reddit, subreddit, cursor, db_conn):
+    for post in reddit.subreddit(subreddit).gilded(limit=100):
+        update_awards(post, reddit, cursor, db_conn)
+
+
+def hot_posts_loop(reddit, subreddit, cursor, db_conn):
+    for post in reddit.subreddit(subreddit).hot(limit=100):
+        update_awards(post, reddit, cursor, db_conn)
+
+
+def update_awards(post, reddit, cursor, db_conn):
+    try:
+        if post.all_awardings:
+            pass
+    except:
+        return
+    for award in post.all_awardings:
+        if not check_awards_membership(award):
+            cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
+            db_conn.commit()
+            awards_dict.update({award['id']: award['name']})
+            sub = reddit.subreddit(PARSED_SUBREDDIT)
+            stylesheet = sub.stylesheet().stylesheet
+            awards_css = generate_awards_css()
+            stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
+            sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
 
 def new_posts_loop(reddit, subreddit, cursor, db_conn):
     current_new_post_list = []
@@ -330,23 +397,42 @@ def check_for_improper_title_spoiler_marks(submission):
     return False
 
 
-def run_bot(reddit, cursor, db):
-    # modqueue loop
-    modqueue_loop(reddit, "Animemes")
-    # new posts loop
-    new_posts_loop(reddit, "Animemes", cursor, db)
-
-
+def run_bot(reddit, cursor, db_conn):
     print("Current time: " + str(datetime.datetime.now().time()))
+    # modqueue loop
     print("Fetching modqueue...")
-    # for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
+    modqueue_loop(reddit, "Animemes", cursor, db_conn)
+    # new posts loop
+    print("Checking new")
+    new_posts_loop(reddit, "Animemes", cursor, db_conn)
+
+    # fetch the modlog
+    print("Fetching modlog")
+    modlog_loop(reddit, "Animemes", cursor, db_conn)
+
+    # fetch modmail
+    print("Fetching Modmail")
+    modmail_fetcher(reddit, "Animemes", cursor, db_conn)
+
+    # Update the post flairs in the DB
+    print("Updating DB flairs")
+    update_flairs_in_the_db(reddit, cursor, db_conn)
+
+    # Get account messages and put them into the appropriate DB
+    print("Getting mail")
+    get_mail(reddit, cursor, db_conn)
+
+    # gilded posts loop
+    print("Checking gilded posts")
+    gilded_posts_loop(reddit, "Animemes", cursor, db_conn)
+
+    # hot posts loop
+    print("Checking hot posts")
+    hot_posts_loop(reddit, "Animemes", cursor, db_conn)
+
+    # print("Checking hentaimemes queue comments")
+    # for comment in reddit2.subreddit('hentaimemes').mod.modqueue(only='comments', limit=None):
     #     print(comment.body)
-    #     if comment.author.name == 'AnimemesBot':
-    #         comment.mod.approve()
-    #         continue
-    #     if comment.author.name == 'RepostSleuthBot':
-    #         if "I didn't find any posts that meet the matching requirements" in comment.body:
-    #             comment.mod.approve()
     #     has_numbers, has_redaction = check_for_violation(comment.body)
     #     if has_numbers:
     #         if not has_redaction:
@@ -354,60 +440,10 @@ def run_bot(reddit, cursor, db):
     #             comment.mod.approve()
     #         else:
     #             print("Removing Comment")
-    #             comment.mod.remove(spam=False, mod_note='Sholi link')
-    #     broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
-    #     if broken_spoiler:
-    #         reply = comment.reply(SPOILER_REMOVAL_COMMENT)
-    #         reply.mod.distinguish(how='yes')
-    #         comment.mod.remove(mod_note="Incorrectly formatted spoiler")
-    #         if spoiler_comment_dict.get(comment.id):
-    #             spoiler_comment_dict[comment.id] = datetime.datetime.now()
-    #         else:
-    #             spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
-    #         save_spoiler_dict(spoiler_comment_dict)
-        
-        # try:
-        #     # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
-        #     # python checks for the existence of an object instead of just a bool.
-        #     if comment.banned_by == True:
-        #         try:
-        #             print(comment.author.id)
-        #         except prawcore.exceptions.NotFound:
-        #             reply = comment.reply(SHADOWBAN_REMOVAL_COMMENT)
-        #             reply.mod.distinguish(how='yes')
-        #             comment.mod.remove(mod_note="Shadowbanned account")
-        # except AttributeError:
-        #     pass
-
-
-    # print("Checking for improper spoilers")
-    # global new_post_list
-    # new_post_list = check_for_improper_spoilers(new_post_list)
-    # print("Checking for re-reported reposts")
-    # approve_old_reposts()
-    print("Checking hentaimemes queue comments")
-    for comment in reddit2.subreddit('hentaimemes').mod.modqueue(only='comments', limit=None):
-        print(comment.body)
-        has_numbers, has_redaction = check_for_violation(comment.body)
-        if has_numbers:
-            if not has_redaction:
-                print("Approving Comment")
-                comment.mod.approve()
-            else:
-                print("Removing Comment")
-                comment.mod.remove(spam=False)
+    #             comment.mod.remove(spam=False)
     
-    print("Grabbing Modlog")
-    grab_modlog()
-    print("Banning for reposts")
-    ban_for_reposts()
-    print("Fetching Modmail")
-    modmail_fetcher()
-    print("Getting mail")
-    get_mail()
-    print("Updating awards")
-    awards_updater()
     print("Checking for edited broken spoiler comments")
+    # possible rewrite to account for the edited comment loop.
     check_for_updated_comments()
     print("Sleeping for 30 seconds...")
     time.sleep(30)
@@ -731,21 +767,21 @@ def approve_weekend_reaction_memes(reports):
         update_db(reports.id, report_dict)
 
 
-def grab_modlog():
-    for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit=None):
-        cursor.execute("SELECT * FROM modlog WHERE id = %s", [action.id])
-        exists = cursor.fetchone()
-        if exists:
-            break
-        cursor.execute("INSERT INTO modlog (action, created_utc, description, details, id, mod, mod_id36, sr_id36, subreddit, subreddit_name_prefixed, target_author, target_body, target_fullname, target_permalink, target_title) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (action.action, convert_time(action.created_utc), action.description, action.details, action.id, str(action.mod), action.mod_id36, action.sr_id36, action.subreddit, action.subreddit_name_prefixed, str(action.target_author), action.target_body, action.target_fullname, action.target_permalink, action.target_title))
-        db_conn.commit()
-    for action in reddit2.subreddit("hentaimemes").mod.log(limit=None):
-        cursor2.execute("SELECT * FROM modlog WHERE id = %s", [action.id])
-        exists = cursor2.fetchone()
-        if exists:
-            break
-        cursor2.execute("INSERT INTO modlog (action, created_utc, description, details, id, mod, mod_id36, sr_id36, subreddit, subreddit_name_prefixed, target_author, target_body, target_fullname, target_permalink, target_title) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (action.action, convert_time(action.created_utc), action.description, action.details, action.id, str(action.mod), action.mod_id36, action.sr_id36, action.subreddit, action.subreddit_name_prefixed, str(action.target_author), action.target_body, action.target_fullname, action.target_permalink, action.target_title))
-        db_conn2.commit()
+# def grab_modlog():
+    # for action in reddit.subreddit(PARSED_SUBREDDIT).mod.log(limit=None):
+    #     cursor.execute("SELECT * FROM modlog WHERE id = %s", [action.id])
+    #     exists = cursor.fetchone()
+    #     if exists:
+    #         break
+    #     cursor.execute("INSERT INTO modlog (action, created_utc, description, details, id, mod, mod_id36, sr_id36, subreddit, subreddit_name_prefixed, target_author, target_body, target_fullname, target_permalink, target_title) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (action.action, convert_time(action.created_utc), action.description, action.details, action.id, str(action.mod), action.mod_id36, action.sr_id36, action.subreddit, action.subreddit_name_prefixed, str(action.target_author), action.target_body, action.target_fullname, action.target_permalink, action.target_title))
+    #     db_conn.commit()
+    # for action in reddit2.subreddit("hentaimemes").mod.log(limit=None):
+    #     cursor2.execute("SELECT * FROM modlog WHERE id = %s", [action.id])
+    #     exists = cursor2.fetchone()
+    #     if exists:
+    #         break
+    #     cursor2.execute("INSERT INTO modlog (action, created_utc, description, details, id, mod, mod_id36, sr_id36, subreddit, subreddit_name_prefixed, target_author, target_body, target_fullname, target_permalink, target_title) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (action.action, convert_time(action.created_utc), action.description, action.details, action.id, str(action.mod), action.mod_id36, action.sr_id36, action.subreddit, action.subreddit_name_prefixed, str(action.target_author), action.target_body, action.target_fullname, action.target_permalink, action.target_title))
+    #     db_conn2.commit()
 
 
 def convert_time(time):
@@ -753,64 +789,64 @@ def convert_time(time):
         return datetime.datetime.utcfromtimestamp(time)
     return None
 
-def ban_for_reposts():
-    # Grab flair edits from modlog
-    cursor.execute("SELECT id, target_fullname FROM modlog WHERE action = 'editflair' and ban_processing = false ORDER BY created_utc DESC LIMIT 100")
-    edit_flair_list = cursor.fetchall()
-    check_ids = []
-    # add all the fullnames into a list
-    for edited_flair in edit_flair_list:
-        if edited_flair[1]:
-            check_ids.append(edited_flair[1])
-    # Fetch them all from reddit
-    if check_ids:
-        for removal_suspect in reddit.info(fullnames=check_ids):
-            # # check that it was posted in november
-            # if convert_time(removal_suspect.created_utc) > datetime.datetime(2019, 12, 1):
-            #     continue
-            # check if they have the right flair
-            try:
-                if removal_suspect.link_flair_template_id:
-                    pass
-            except AttributeError:
-                continue
-            cursor.execute("UPDATE posts SET link_flair_template_id = %s, link_flair_text = %s WHERE id = %s", (removal_suspect.link_flair_template_id, removal_suspect.link_flair_text, removal_suspect.id))
-        #     if removal_suspect.link_flair_template_id == 'e186588a-fcc7-11e9-8108-0e38adec5b54':
-        #         # check if they have actually been removed
-        #         cursor.execute("SELECT id, action, target_author FROM modlog WHERE target_fullname = %s AND NOT action = 'editflair' ORDER BY created_utc DESC", (removal_suspect.name,))
-        #         current_state = cursor.fetchone()
-        #         if current_state and current_state[1] == 'removelink':
-        #             # ban the user
-        #             cursor.execute("SELECT id, created_utc FROM modlog WHERE target_author = %s AND mod = 'SachiMod' AND action = 'banuser' ORDER BY created_utc DESC", (current_state[2],))
-        #             previous_violations = cursor.fetchall()
-        #             if previous_violations:
-        #                 if len(previous_violations) == 1 and (datetime.datetime.now() - previous_violations[0][1] > datetime.timedelta(days=3)):
-        #                     ban_user(current_state[2], duration=7, note=f"2nd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Looks like the first ban did not drive the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) home. Maybe this will. See you in a week.\n\nThis is your last warning before being banned for the rest of the month. Make sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.')
-        #                     print(f"User: {current_state[2]} banned for the 2nd time")
-        #                 elif len(previous_violations) == 2 and (datetime.datetime.now() - previous_violations[0][1] > datetime.timedelta(days=7)):
-        #                     ban_user(current_state[2], duration=21, note=f"3rd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Since the previous two bans did not manage to explain that we really mean it with ["No Reposts" during "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/), you can just chill until December.')
-        #                     print(f"User: {current_state[2]} banned for the 3rd time")
-        #             else:
-        #                 ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
-        #                 print(f"User: {current_state[2]} banned")
+# def ban_for_reposts():
+#     # # Grab flair edits from modlog
+#     # cursor.execute("SELECT id, target_fullname FROM modlog WHERE action = 'editflair' and ban_processing = false ORDER BY created_utc DESC LIMIT 100")
+#     # edit_flair_list = cursor.fetchall()
+#     # check_ids = []
+#     # # add all the fullnames into a list
+#     # for edited_flair in edit_flair_list:
+#     #     if edited_flair[1]:
+#     #         check_ids.append(edited_flair[1])
+#     # # Fetch them all from reddit
+#     # if check_ids:
+#     #     for removal_suspect in reddit.info(fullnames=check_ids):
+#     #         # # check that it was posted in november
+#     #         # if convert_time(removal_suspect.created_utc) > datetime.datetime(2019, 12, 1):
+#     #         #     continue
+#     #         # check if they have the right flair
+#     #         try:
+#     #             if removal_suspect.link_flair_template_id:
+#     #                 pass
+#     #         except AttributeError:
+#     #             continue
+#     #         cursor.execute("UPDATE posts SET link_flair_template_id = %s, link_flair_text = %s WHERE id = %s", (removal_suspect.link_flair_template_id, removal_suspect.link_flair_text, removal_suspect.id))
+#     #     #     if removal_suspect.link_flair_template_id == 'e186588a-fcc7-11e9-8108-0e38adec5b54':
+#     #     #         # check if they have actually been removed
+#     #     #         cursor.execute("SELECT id, action, target_author FROM modlog WHERE target_fullname = %s AND NOT action = 'editflair' ORDER BY created_utc DESC", (removal_suspect.name,))
+#     #     #         current_state = cursor.fetchone()
+#     #     #         if current_state and current_state[1] == 'removelink':
+#     #     #             # ban the user
+#     #     #             cursor.execute("SELECT id, created_utc FROM modlog WHERE target_author = %s AND mod = 'SachiMod' AND action = 'banuser' ORDER BY created_utc DESC", (current_state[2],))
+#     #     #             previous_violations = cursor.fetchall()
+#     #     #             if previous_violations:
+#     #     #                 if len(previous_violations) == 1 and (datetime.datetime.now() - previous_violations[0][1] > datetime.timedelta(days=3)):
+#     #     #                     ban_user(current_state[2], duration=7, note=f"2nd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Looks like the first ban did not drive the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) home. Maybe this will. See you in a week.\n\nThis is your last warning before being banned for the rest of the month. Make sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.')
+#     #     #                     print(f"User: {current_state[2]} banned for the 2nd time")
+#     #     #                 elif len(previous_violations) == 2 and (datetime.datetime.now() - previous_violations[0][1] > datetime.timedelta(days=7)):
+#     #     #                     ban_user(current_state[2], duration=21, note=f"3rd automated ban for reposting a meme http://redd.it/{removal_suspect.id}", ban_message = 'Since the previous two bans did not manage to explain that we really mean it with ["No Reposts" during "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/), you can just chill until December.')
+#     #     #                     print(f"User: {current_state[2]} banned for the 3rd time")
+#     #     #             else:
+#     #     #                 ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
+#     #     #                 print(f"User: {current_state[2]} banned")
 
-        # event removal processing
-            if removal_suspect.link_flair_template_id == 'eeaebb92-8b38-11ea-a432-0e232b3ed13d':
-                cursor.execute("SELECT id, created_utc, mod FROM modlog WHERE target_fullname = %s AND action = 'removelink' ORDER BY created_utc DESC", (removal_suspect.name,))
-                log_entry = cursor.fetchone()
-                if log_entry:
-                    cursor.execute("INSERT INTO event_removals (id, created_utc, mod, target_id, event) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (ID) DO NOTHING", (log_entry[0], log_entry[1], log_entry[2], removal_suspect.id, "NSFW Spoiler"))
-        for entry in edit_flair_list:
-            cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
-        db_conn.commit()
+#         # event removal processing
+#             # if removal_suspect.link_flair_template_id == 'eeaebb92-8b38-11ea-a432-0e232b3ed13d':
+#             #     cursor.execute("SELECT id, created_utc, mod FROM modlog WHERE target_fullname = %s AND action = 'removelink' ORDER BY created_utc DESC", (removal_suspect.name,))
+#             #     log_entry = cursor.fetchone()
+#             #     if log_entry:
+#             #         cursor.execute("INSERT INTO event_removals (id, created_utc, mod, target_id, event) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (ID) DO NOTHING", (log_entry[0], log_entry[1], log_entry[2], removal_suspect.id, "NSFW Spoiler"))
+#         for entry in edit_flair_list:
+#             cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
+#         db_conn.commit()
 
 
 def ban_user(user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone did not understand the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) and should have some sense [smacked into them](https://i.imgur.com/4VsscZB.png). See you in three days\n\nMake sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.', duration = 3, note = "Automated ban for reposting a meme"):
     reddit.subreddit(PARSED_SUBREDDIT).banned.add(user, ban_reason=ban_reason, ban_message=ban_message, duration=duration, note=note)
 
 
-def modmail_fetcher():
-    for message in reddit.subreddit(PARSED_SUBREDDIT).mod.inbox(limit=None):
+def modmail_fetcher(reddit, subreddit, cursor, db_conn):
+    for message in reddit.subreddit(subreddit).mod.inbox(limit=None):
         cursor.execute("SELECT id, replies FROM modmail WHERE id = %s", [message.id])
         replies = [reply.id for reply in message.replies]
         exists = cursor.fetchone()
@@ -822,40 +858,40 @@ def modmail_fetcher():
         db_conn.commit()
 
 
-def awards_updater():
-    # print(awards_dict)
-    for post in reddit.subreddit(PARSED_SUBREDDIT).gilded(limit=100):
-        try:
-            if post.all_awardings:
-                pass
-        except:
-            continue
-        for award in post.all_awardings:
-            if not check_awards_membership(award):
-                cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
-                db_conn.commit()
-                awards_dict.update({award['id']: award['name']})
-                sub = reddit.subreddit(PARSED_SUBREDDIT)
-                stylesheet = sub.stylesheet().stylesheet
-                awards_css = generate_awards_css()
-                stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
-                sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
-    for post in reddit.subreddit(PARSED_SUBREDDIT).hot(limit=100):
-        try:
-            if post.all_awardings:
-                pass
-        except:
-            continue
-        for award in post.all_awardings:
-            if not check_awards_membership(award):
-                cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
-                db_conn.commit()
-                awards_dict.update({award['id']: award['name']})
-                sub = reddit.subreddit(PARSED_SUBREDDIT)
-                stylesheet = sub.stylesheet().stylesheet
-                awards_css = generate_awards_css()
-                stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
-                sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
+# def awards_updater():
+#     # print(awards_dict)
+#     for post in reddit.subreddit(PARSED_SUBREDDIT).gilded(limit=100):
+#         try:
+#             if post.all_awardings:
+#                 pass
+#         except:
+#             continue
+#         for award in post.all_awardings:
+#             if not check_awards_membership(award):
+#                 cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
+#                 db_conn.commit()
+#                 awards_dict.update({award['id']: award['name']})
+#                 sub = reddit.subreddit(PARSED_SUBREDDIT)
+#                 stylesheet = sub.stylesheet().stylesheet
+#                 awards_css = generate_awards_css()
+#                 stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
+#                 sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
+#     for post in reddit.subreddit(PARSED_SUBREDDIT).hot(limit=100):
+#         try:
+#             if post.all_awardings:
+#                 pass
+#         except:
+#             continue
+#         for award in post.all_awardings:
+#             if not check_awards_membership(award):
+#                 cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
+#                 db_conn.commit()
+#                 awards_dict.update({award['id']: award['name']})
+#                 sub = reddit.subreddit(PARSED_SUBREDDIT)
+#                 stylesheet = sub.stylesheet().stylesheet
+#                 awards_css = generate_awards_css()
+#                 stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
+#                 sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
 
 
 def check_awards_membership(award):
@@ -883,7 +919,7 @@ def generate_awards_css():
     return css_string
 
 
-def get_mail():
+def get_mail(reddit, cursor, db_conn):
     for message in reddit.inbox.all(limit=None):
         cursor.execute("SELECT id, replies FROM modmail WHERE id = %s", [message.id])
         replies = [reply.id for reply in message.replies]
