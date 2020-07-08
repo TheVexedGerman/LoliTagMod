@@ -578,7 +578,7 @@ def modmail_fetcher():
             break
         cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, replies, subject, author, body, dest) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET replies = EXCLUDED.replies, dest = EXCLUDED.dest, sent_to_discord = false", (message.id, convert_time(message.created_utc), message.first_message_name, replies, message.subject, str(message.author), message.body, str(message.dest)))
         for reply in message.replies:
-            cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, subject, author, parent_id, body) VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), reply.first_message_name, reply.subject, str(reply.author), reply.parent_id, reply.body)
+            cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, subject, author, parent_id, body) VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), reply.first_message_name, reply.subject, str(reply.author), reply.parent_id, reply.body))
         db_conn.commit()
     for message in reddit.subreddit(PARSED_SUBREDDIT).mod.unread(limit=None):
         cursor.execute("INSERT INTO modmail (id, created_utc, subject, author, body, dest) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (message.id, convert_time(message.created_utc), message.subject, str(message.author), message.body, str(message.dest)))
