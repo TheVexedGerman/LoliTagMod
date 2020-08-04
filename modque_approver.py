@@ -106,6 +106,9 @@ def run_bot():
             if "I didn't find any posts that meet the matching requirements" in comment.body:
                 comment.mod.approve()
                 continue
+        if comment.submission.id == 'i2mn3g' and comment.banned_by == 'AutoModerator':
+            comment.mod.approve()
+            continue
         has_numbers, has_redaction = check_for_violation(comment.body)
         if has_numbers:
             if not has_redaction:
