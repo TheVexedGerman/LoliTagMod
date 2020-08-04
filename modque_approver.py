@@ -99,7 +99,7 @@ def run_bot():
     print("Fetching modqueue...")
     for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.modqueue(only='comments', limit=None):
         print(comment.body)
-        if comment.author.name == 'AnimemesBot':
+        if comment.author.name == 'AnimemesBot' or comment.author.name == 'AutoModerator':
             comment.mod.approve()
             continue
         if comment.author.name == 'RepostSleuthBot':
