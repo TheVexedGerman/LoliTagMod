@@ -106,7 +106,7 @@ def run_bot():
             if "I didn't find any posts that meet the matching requirements" in comment.body:
                 comment.mod.approve()
                 continue
-        if comment.body.lower == 'trap' and comment.banned_by == 'AutoModerator':
+        if comment.body.lower() == 'trap' and comment.banned_by == 'AutoModerator':
             comment.mod.remove()
             continue
         has_numbers, has_redaction = check_for_violation(comment.body)
