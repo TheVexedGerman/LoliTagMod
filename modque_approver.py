@@ -94,6 +94,35 @@ def main():
         run_bot()
 
 
+def check_dupebro_for_redundant_info(comment):
+    matches = re.findall(r'(?<=https://reddit.com/r/Animemes/comments/)[a-z0-9]{1,6}', comment.body)
+    # print(comment.body)
+    # print(matches)
+    submission_comments = comment.submission.comments.list()
+    ab_comment = None
+    for com in submission_comments:
+        if com.author.name == 'AnimemesBot':
+            ab_comment = com
+            # break
+    if not ab_comment:
+        return
+    # print(ab_comment.body)
+    ab_matches = re.findall(r'(?<=https:\/\/redd.it\/)[a-z0-9]{1,6}', ab_comment.body)
+    matches = set(matches)
+    try:
+        matches.remove(comment.submission.id)
+    except ValueError:
+        pass
+    print(matches)
+    print(ab_matches)
+    all_matches_contained = all(item in ab_matches for item in matches)
+    if all_matches_contained:
+        print("removeing")
+        comment.mod.remove()
+    return
+
+
+
 def run_bot():
     print("Current time: " + str(datetime.datetime.now().time()))
     print("Fetching modqueue...")
@@ -128,7 +157,12 @@ def run_bot():
             else:
                 spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
             save_spoiler_dict(spoiler_comment_dict)
+        # remove dupebro comments that contain the same posts as the animemesbot comment
+        if comment.author.name == 'DupeBro':
+            print('checking for similar matches with DupeBro')
+            check_dupebro_for_redundant_info(comment)
         
+
         try:
             # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
             # python checks for the existence of an object instead of just a bool.
