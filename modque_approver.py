@@ -281,7 +281,7 @@ def check_for_improper_spoilers(new_post_list):
                 
 
         # check for spoiler formatted title but no spoiler tag
-        if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler and '[contest]' not in submission.title.lower():
+        if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[redacted]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler and '[contest]' not in submission.title.lower():
             submission.report('Possibly missing spoiler tag')
         # check for spoiler tag byt not properly formatted title
         if submission.spoiler:
@@ -327,21 +327,21 @@ def check_for_improper_spoilers(new_post_list):
 
     # make sure there is a previous list
     print(new_post_list)
-    if new_post_list:
-        # determine the offset between the old and the new list
-        offset = get_offset(current_new_post_list, new_post_list)
-        for i, entry in enumerate(new_post_list):
-            # exit if the end of new list has been reached.
-            if i + offset >= len(current_new_post_list):
-                break
-            else:
-                # improve this so it doesn't automatically go to the next entry.
-                # check if the ids are identical
-                if entry != current_new_post_list[i+offset]:
-                    print(f"{submission.id}: {submission.created_utc} was removed")
-                    cursor.execute("UPDATE posts SET estimated_deletion_time = %s WHERE id = %s", (datetime.datetime.now(), entry))
-                    # move the offset one back because the new list is now missing one entry.
-                    offset += -1
+    # if new_post_list:
+    #     # determine the offset between the old and the new list
+    #     offset = get_offset(current_new_post_list, new_post_list)
+    #     for i, entry in enumerate(new_post_list):
+    #         # exit if the end of new list has been reached.
+    #         if i + offset >= len(current_new_post_list):
+    #             break
+    #         else:
+    #             # improve this so it doesn't automatically go to the next entry.
+    #             # check if the ids are identical
+    #             if entry != current_new_post_list[i+offset]:
+    #                 print(f"{submission.id}: {submission.created_utc} was removed")
+    #                 cursor.execute("UPDATE posts SET estimated_deletion_time = %s WHERE id = %s", (datetime.datetime.now(), entry))
+    #                 # move the offset one back because the new list is now missing one entry.
+    #                 offset += -1
     # set the new list to be the one checked next time
     return current_new_post_list
         
