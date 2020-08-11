@@ -574,7 +574,7 @@ def ban_for_reposts():
             cursor.execute("UPDATE posts SET link_flair_template_id = %s, link_flair_text = %s WHERE id = %s", (removal_suspect.link_flair_template_id, removal_suspect.link_flair_text, removal_suspect.id))
 
             # Auto ban people having their posts removed again after being banned previously
-            cursor.execute("SELECT created_utc, target_author FROM modlog WHERE target_author = (SELECT target_author FROM modlog WHERE target_fullname = %s AND NOT mod = 'SachiMod' LIMIT 1) AND action = 'banuser' AND created_utc > '2020-08-03' ORDER BY created_utc DESC", (removal_suspect.name,))
+            cursor.execute("SELECT created_utc, target_author FROM modlog WHERE target_author = (SELECT target_author FROM modlog WHERE target_fullname = %s AND NOT mod = 'SachiMod' LIMIT 1) AND action = 'banuser' AND created_utc > '2020-08-03' AND created_utc < (now() at time zone 'utc') - interval '1 day' ORDER BY created_utc DESC", (removal_suspect.name,))
             previous_bans = cursor.fetchall()
             if len(previous_bans) > 0:
                 ban_user(previous_bans[0][1], duration=14, note=f"Automated ban for breaking the rules after the last ban", ban_message = 'It appears you have created another rule breaking post after being banned previously. Please take some time to familiarize yourself with [our rules](https://www.reddit.com/r/Animemes/wiki/extendedrules) before posting again.', ban_reason="Automated reban")
