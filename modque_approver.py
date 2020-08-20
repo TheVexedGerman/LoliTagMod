@@ -607,10 +607,13 @@ def ban_for_reposts():
                     password = postgres_credentials_modque.PASSWORD
                     )
                 cur = db.cursor()
+                print(removal_suspect.id)
                 cursor.execute("SELECT author FROM posts WHERE id = %s", (removal_suspect.id,))
                 author = cursor.fetchone()
                 cur.execute("SELECT client_id FROM client_registration WHERE heartbeat > now() at time zone 'utc' - interval '2 minutes' ORDER BY case when busy then remaining_api_calls end desc, heartbeat desc LIMIT 1")
-                client_id = cursor.fetchone()
+                client_id = cur.fetchone()
+                print(author)
+                print(client_id)
                 if client_id and author:
                     cur.execute("INSERT INTO jobs (client_id, \"user\", finished, type) VALUES (%s, %s, False, 'purge')", (client_id[0], author[0]))
                     cur.execute("UPDATE client_registration SET busy = True WHERE client_id = %s", (client_id[0],))
