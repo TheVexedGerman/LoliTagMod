@@ -609,7 +609,7 @@ def ban_for_reposts():
                 cur = db.cursor()
                 cursor.execute("SELECT author FROM posts WHERE id = %s", (removal_suspect.id,))
                 author = cursor.fetchone()
-                cursor.execute("SELECT client_id FROM client_registration WHERE heartbeat > now() at time zone 'utc' - interval '2 minutes' ORDER BY case when busy then remaining_api_calls end desc, heartbeat desc LIMIT 1")
+                cur.execute("SELECT client_id FROM client_registration WHERE heartbeat > now() at time zone 'utc' - interval '2 minutes' ORDER BY case when busy then remaining_api_calls end desc, heartbeat desc LIMIT 1")
                 client_id = cursor.fetchone()
                 if client_id and author:
                     cur.execute("INSERT INTO jobs (client_id, \"user\", finished, type) VALUES (%s, %s, False, 'purge')", (client_id[0], author[0]))
