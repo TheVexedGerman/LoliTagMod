@@ -599,6 +599,24 @@ def ban_for_reposts():
         #             else:
         #                 ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
         #                 print(f"User: {current_state[2]} banned")
+            if removal_suspect.link_flair_template_id == 'c5b88c96-e32f-11ea-b51f-0e4c27b0997b':
+                db = psycopg2.connect(
+                    host = postgres_credentials_modque.HOST,
+                    database = "burning_bridges",
+                    user = postgres_credentials_modque.USER,
+                    password = postgres_credentials_modque.PASSWORD
+                    )
+                cur = db.cursor()
+                cursor.execute("SELECT author FROM posts WHERE id = %s", (removal_suspect.id,))
+                author = cursor.fetchone()
+                cursor.execute("SELECT client_id FROM client_registration WHERE heartbeat > now() at time zone 'utc' - interval '2 minutes' ORDER BY case when busy then remaining_api_calls end desc, heartbeat desc LIMIT 1")
+                client_id = cursor.fetchone()
+                if client_id and author:
+                    cur.execute("INSERT INTO jobs (client_id, \"user\", finished, type) VALUES (%s, %s, False, 'purge')", (client_id[0], author[0]))
+                    cur.execute("UPDATE jobs SET busy = True WHERE client_id = %s", (client_id[0],))
+                db.commit()
+                cur.close()
+                db.close()
 
         # event removal processing
             if removal_suspect.link_flair_template_id == 'eeaebb92-8b38-11ea-a432-0e232b3ed13d':
