@@ -613,7 +613,7 @@ def ban_for_reposts():
                 client_id = cursor.fetchone()
                 if client_id and author:
                     cur.execute("INSERT INTO jobs (client_id, \"user\", finished, type) VALUES (%s, %s, False, 'purge')", (client_id[0], author[0]))
-                    cur.execute("UPDATE jobs SET busy = True WHERE client_id = %s", (client_id[0],))
+                    cur.execute("UPDATE client_registration SET busy = True WHERE client_id = %s", (client_id[0],))
                 db.commit()
                 cur.close()
                 db.close()
