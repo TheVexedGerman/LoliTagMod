@@ -599,7 +599,8 @@ def ban_for_reposts():
         #             else:
         #                 ban_user(current_state[2], note=f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}")
         #                 print(f"User: {current_state[2]} banned")
-            if removal_suspect.link_flair_template_id == 'c5b88c96-e32f-11ea-b51f-0e4c27b0997b':
+            if removal_suspect.link_flair_template_id == 'c5b88c96-e32f-11ea-b51f-0e4c27b0997b' or removal_suspect.link_flair_template_id == '3672f04c-e3a9-11ea-9692-0e5b9ada98e5':
+                kind = 'purge' if removal_suspect.link_flair_template_id == 'c5b88c96-e32f-11ea-b51f-0e4c27b0997b' else 'clean'
                 db = psycopg2.connect(
                     host = postgres_credentials_modque.HOST,
                     database = "burning_bridges",
@@ -615,7 +616,7 @@ def ban_for_reposts():
                 print(author)
                 print(client_id)
                 if client_id and author:
-                    cur.execute("INSERT INTO jobs (client_id, \"user\", finished, type) VALUES (%s, %s, False, 'purge')", (client_id[0], author[0]))
+                    cur.execute("INSERT INTO jobs (client_id, \"user\", finished, type) VALUES (%s, %s, False, %s)", (client_id[0], author[0], kind))
                     cur.execute("UPDATE client_registration SET busy = True WHERE client_id = %s", (client_id[0],))
                 db.commit()
                 cur.close()
