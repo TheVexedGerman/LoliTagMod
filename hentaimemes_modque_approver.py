@@ -112,6 +112,8 @@ def grab_modlog():
             break
         cursor.execute("INSERT INTO modlog (action, created_utc, description, details, id, mod, mod_id36, sr_id36, subreddit, subreddit_name_prefixed, target_author, target_body, target_fullname, target_permalink, target_title) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (action.action, convert_time(action.created_utc), action.description, action.details, action.id, str(action.mod), action.mod_id36, action.sr_id36, action.subreddit, action.subreddit_name_prefixed, str(action.target_author), action.target_body, action.target_fullname, action.target_permalink, action.target_title))
         db_conn.commit()
+    print("Sleeping for 30 seconds...")
+    time.sleep(30)
 
 def main():
     global reddit
@@ -119,13 +121,16 @@ def main():
     global cursor
     global db_conn
     db_conn, cursor = authenticate_db()
+    while True:
+        run_bot()
 
 
 if __name__ == '__main__':
-    while True:
-        try:
-            main()
-        except Exception as e:
-            print(traceback.format_exc())
-            open("logh.txt", 'a').write(f"{datetime.datetime.now().time()}:\n{traceback.format_exc()}\n")
-            pass
+    # while True:
+    #     try:
+    #         main()
+    #     except Exception as e:
+    #         print(traceback.format_exc())
+    #         open("logh.txt", 'a').write(f"{datetime.datetime.now().time()}:\n{traceback.format_exc()}\n")
+    #         pass
+    main()
