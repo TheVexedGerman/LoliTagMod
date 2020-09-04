@@ -172,7 +172,7 @@ def update_flairs_in_the_db(reddit, cursor, db_conn):
                 continue
             cursor.execute("UPDATE posts SET link_flair_template_id = %s, link_flair_text = %s WHERE id = %s", (removal_suspect.link_flair_template_id, removal_suspect.link_flair_text, removal_suspect.id))
             # Automated bans
-            # automatic_ban_for_repeat_rule_breaking(reddit, cursor)
+            # automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect)
 
             # Clean users with the proper flairs
             purge_and_clean(removal_suspect, cursor)
@@ -184,7 +184,7 @@ def update_flairs_in_the_db(reddit, cursor, db_conn):
         db_conn.commit()
 
 
-def automatic_ban_for_repeat_rule_breaking(reddit, cursor):
+def automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect):
     # Auto ban people having their posts removed again after being banned previously
     cursor.execute("SELECT created_utc, target_author FROM modlog WHERE target_author = (SELECT target_author FROM modlog WHERE target_fullname = %s AND NOT mod = 'SachiMod' LIMIT 1) AND action = 'banuser' AND created_utc > '2020-08-03' AND created_utc < (now() at time zone 'utc') - interval '1 day' ORDER BY created_utc DESC", (removal_suspect.name,))
     previous_bans = cursor.fetchall()
@@ -687,10 +687,6 @@ def convert_time(time):
     if time:
         return datetime.datetime.utcfromtimestamp(time)
     return None
-
-
-def ban_user(reddit, user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone did not understand the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) and should have some sense [smacked into them](https://i.imgur.com/4VsscZB.png). See you in three days\n\nMake sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.', duration = 3, note = "Automated ban for reposting a meme"):
-    reddit.subreddit(PARSED_SUBREDDIT).banned.add(user, ban_reason=ban_reason, ban_message=ban_message, duration=duration, note=note)
 
 
 def modmail_fetcher(reddit, subreddit, cursor, db_conn):
