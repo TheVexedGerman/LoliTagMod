@@ -61,22 +61,16 @@ def authenticate():
         # 'lolitagmod'
         )
     print("Authenticated as {}".format(reddit.user.me()))
-    reddit2 = praw.Reddit(
-        'hentaimemesmod'
-        )
-    print("Authenticated as {}".format(reddit2.user.me()))
-    return reddit, reddit2
+    # reddit2 = praw.Reddit(
+    #     'hentaimemesmod'
+    #     )
+    # print("Authenticated as {}".format(reddit2.user.me()))
+    return reddit
 
 
 def main():
-    # global reddit
-    # global reddit2
-    reddit, reddit2 = authenticate()
-    # global cursor
-    # global db_conn
-    # global cursor2
-    # global db_conn2
-    db_conn, cursor, db_conn2, cursor2 = authenticate_db()
+    reddit = authenticate()
+    db_conn, cursor = authenticate_db()
     global watched_id_set
     watched_id_set = set()
     global watched_id_report_dict
@@ -583,14 +577,15 @@ def authenticate_db():
     user = postgres_credentials_modque.USER,
     password = postgres_credentials_modque.PASSWORD
     )
-    db_conn2 = psycopg2.connect(
-    host = postgres_credentials_modque.HOST,
-    database = 'hentaimemes',
-    user = postgres_credentials_modque.USER,
-    password = postgres_credentials_modque.PASSWORD
-    )   
+    # db_conn2 = psycopg2.connect(
+    # host = postgres_credentials_modque.HOST,
+    # database = 'hentaimemes',
+    # user = postgres_credentials_modque.USER,
+    # password = postgres_credentials_modque.PASSWORD
+    # )   
 
-    return db_conn, db_conn.cursor(), db_conn2, db_conn2.cursor()
+    # return db_conn, db_conn.cursor(), db_conn2, db_conn2.cursor()
+    return db_conn, db_conn.cursor()
 
 
 def update_db(post_id, reports_dict, cursor, db_conn):
