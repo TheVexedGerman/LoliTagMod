@@ -98,7 +98,7 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
         if item.name[:2] == 't1':
             print(item.body)
             # automatically approve comments made by the bot
-            if item.author.name == 'AnimemesBot':
+            if item.author.name == 'AnimemesBot' or item.author.name == 'AutoModerator':
                 item.mod.approve()
                 continue
 
