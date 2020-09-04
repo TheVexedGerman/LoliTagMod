@@ -179,6 +179,10 @@ def update_flairs_in_the_db(reddit, cursor, db_conn):
             cursor.execute("UPDATE posts SET link_flair_template_id = %s, link_flair_text = %s WHERE id = %s", (removal_suspect.link_flair_template_id, removal_suspect.link_flair_text, removal_suspect.id))
             # Automated bans
             # automatic_ban_for_repeat_rule_breaking(reddit, cursor)
+
+            # Clean users with the proper flairs
+            purge_and_clean(removal_suspect, cursor)
+
             # Feed the event removals mirror db
             event_removal_db_update(removal_suspect, cursor)
         for entry in edit_flair_list:
@@ -191,11 +195,36 @@ def automatic_ban_for_repeat_rule_breaking(reddit, cursor):
     cursor.execute("SELECT created_utc, target_author FROM modlog WHERE target_author = (SELECT target_author FROM modlog WHERE target_fullname = %s AND NOT mod = 'SachiMod' LIMIT 1) AND action = 'banuser' AND created_utc > '2020-08-03' AND created_utc < (now() at time zone 'utc') - interval '1 day' ORDER BY created_utc DESC", (removal_suspect.name,))
     previous_bans = cursor.fetchall()
     if len(previous_bans) > 0:
-        ban_user(previous_bans[0][1], duration=14, note=f"Automated ban for breaking the rules after the last ban", ban_message = 'It appears you have created another rule breaking post after being banned previously. Please take some time to familiarize yourself with [our rules](https://www.reddit.com/r/Animemes/wiki/extendedrules) before posting again.', ban_reason="Automated reban")
+        ban_user(reddit, previous_bans[0][1], duration=14, note=f"Automated ban for breaking the rules after the last ban", ban_message = 'It appears you have created another rule breaking post after being banned previously. Please take some time to familiarize yourself with [our rules](https://www.reddit.com/r/Animemes/wiki/extendedrules) before posting again.', ban_reason="Automated reban")
         print(f"User: {previous_bans[0][1]} banned for the 2nd time")
 
 
-def ban_user(user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone did not understand the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) and should have some sense [smacked into them](https://i.imgur.com/4VsscZB.png). See you in three days\n\nMake sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.', duration = 3, note = "Automated ban for reposting a meme"):
+def purge_and_clean(removal_suspect, cursor):
+    if removal_suspect.link_flair_template_id == 'c5b88c96-e32f-11ea-b51f-0e4c27b0997b' or removal_suspect.link_flair_template_id == '3672f04c-e3a9-11ea-9692-0e5b9ada98e5':
+        kind = 'purge' if removal_suspect.link_flair_template_id == 'c5b88c96-e32f-11ea-b51f-0e4c27b0997b' else 'clean'
+        db = psycopg2.connect(
+            host = postgres_credentials_modque.HOST,
+            database = "burning_bridges",
+            user = postgres_credentials_modque.USER,
+            password = postgres_credentials_modque.PASSWORD
+            )
+        cur = db.cursor()
+        print(removal_suspect.id)
+        cursor.execute("SELECT author FROM posts WHERE id = %s", (removal_suspect.id,))
+        author = cursor.fetchone()
+        cur.execute("SELECT client_id FROM client_registration WHERE heartbeat > now() at time zone 'utc' - interval '2 minutes' ORDER BY case when busy then remaining_api_calls end desc, heartbeat desc LIMIT 1")
+        client_id = cur.fetchone()
+        print(author)
+        print(client_id)
+        if client_id and author:
+            cur.execute("INSERT INTO jobs (client_id, \"user\", finished, type) VALUES (%s, %s, False, %s)", (client_id[0], author[0], kind))
+            cur.execute("UPDATE client_registration SET busy = True WHERE client_id = %s", (client_id[0],))
+        db.commit()
+        cur.close()
+        db.close()
+
+
+def ban_user(reddit, user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone did not understand the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) and should have some sense [smacked into them](https://i.imgur.com/4VsscZB.png). See you in three days\n\nMake sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.', duration = 3, note = "Automated ban for reposting a meme"):
     reddit.subreddit(PARSED_SUBREDDIT).banned.add(user, ban_reason=ban_reason, ban_message=ban_message, duration=duration, note=note)
 
 def event_removal_db_update(removal_suspect, cursor):
