@@ -195,6 +195,9 @@ def automatic_ban_for_repeat_rule_breaking(reddit, cursor):
         print(f"User: {previous_bans[0][1]} banned for the 2nd time")
 
 
+def ban_user(user, ban_reason = "NRN: Reposted a meme", ban_message = 'Looks like someone did not understand the ["No Repost" part of "No Repost November"](https://www.reddit.com/r/Animemes/comments/dpwdn5/_/f5z3txs/) and should have some sense [smacked into them](https://i.imgur.com/4VsscZB.png). See you in three days\n\nMake sure to check your post hasn\'t been posted before on Animemes. Try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.', duration = 3, note = "Automated ban for reposting a meme"):
+    reddit.subreddit(PARSED_SUBREDDIT).banned.add(user, ban_reason=ban_reason, ban_message=ban_message, duration=duration, note=note)
+
 def event_removal_db_update(removal_suspect, cursor):
     # Event removal flair ID
     if removal_suspect.link_flair_template_id == 'eeaebb92-8b38-11ea-a432-0e232b3ed13d':
