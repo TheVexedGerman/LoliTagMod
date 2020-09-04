@@ -654,7 +654,7 @@ def get_awards_dict(cursor):
 def generate_awards_css():
     css_string = '\n'
     for key in awards_dict.keys():
-        css_string += f'a.awarding-link[data-award-id$={key[-6:]}]:hover:before {{\n    content: "{awards_dict[key]}";\n}}\n'
+        css_string += f'a.awarding-link[data-award-id$="{key[-6:]}"]:hover:before {{\n    content: "{awards_dict[key]}";\n}}\n'
     return css_string
 
 
