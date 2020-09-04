@@ -108,6 +108,11 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
                     item.mod.approve()
                     continue
 
+            if item.author.name == 'DupeBro':
+                print('checking for similar matches with DupeBro')
+                check_dupebro_for_redundant_info(item)
+                continue
+
             # check if the comment is linking to loli content
             if check_for_sholi_links(item):
                 continue
@@ -234,6 +239,34 @@ def approve_no_dignity_repost_reports(reports, cursor, db_conn):
         pass
 
 
+def check_dupebro_for_redundant_info(comment):
+    matches = re.findall(r'(?<=https://reddit.com/r/Animemes/comments/)[a-z0-9]{1,6}', comment.body)
+    # print(comment.body)
+    # print(matches)
+    submission_comments = comment.submission.comments.list()
+    ab_comment = None
+    for com in submission_comments:
+        if com.author.name == 'AnimemesBot':
+            ab_comment = com
+            # break
+    if not ab_comment:
+        return
+    # print(ab_comment.body)
+    ab_matches = re.findall(r'(?<=https:\/\/redd.it\/)[a-z0-9]{1,6}', ab_comment.body)
+    matches = set(matches)
+    try:
+        matches.remove(comment.submission.id)
+    except ValueError:
+        pass
+    print(matches)
+    print(ab_matches)
+    all_matches_contained = all(item in ab_matches for item in matches)
+    if all_matches_contained:
+        print("removeing")
+        comment.mod.remove()
+    return
+
+
 def remove_shadowbanned_comments(comment):
     try:
         # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
@@ -313,7 +346,7 @@ def new_posts_loop(reddit, subreddit, cursor, db_conn):
         current_new_post_list.append(submission.id)
 
         # check for spoiler formatted title but no spoiler tag
-        if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[contest]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
+        if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[redacted]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
             submission.report('Possibly missing spoiler tag')
 
         # check if the post is spoiler marked but not titled correctly:
