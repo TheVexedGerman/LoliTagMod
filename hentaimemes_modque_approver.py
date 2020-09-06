@@ -126,11 +126,11 @@ def main():
 
 
 if __name__ == '__main__':
-    # while True:
-    #     try:
-    #         main()
-    #     except Exception as e:
-    #         print(traceback.format_exc())
-    #         open("logh.txt", 'a').write(f"{datetime.datetime.now().time()}:\n{traceback.format_exc()}\n")
-    #         pass
-    main()
+    while True:
+        try:
+            main()
+        except Exception as e:
+            print(traceback.format_exc())
+            open("logh.txt", 'a').write(f"{datetime.datetime.now().time()}:\n{traceback.format_exc()}\n")
+            pass
+    # main()
