@@ -172,7 +172,7 @@ def update_flairs_in_the_db(reddit, cursor, db_conn):
                 continue
             cursor.execute("UPDATE posts SET link_flair_template_id = %s, link_flair_text = %s WHERE id = %s", (removal_suspect.link_flair_template_id, removal_suspect.link_flair_text, removal_suspect.id))
             # Automated bans
-            # automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect)
+            automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect)
 
             # Clean users with the proper flairs
             purge_and_clean(removal_suspect, cursor)
@@ -186,11 +186,28 @@ def update_flairs_in_the_db(reddit, cursor, db_conn):
 
 def automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect):
     # Auto ban people having their posts removed again after being banned previously
-    cursor.execute("SELECT created_utc, target_author FROM modlog WHERE target_author = (SELECT target_author FROM modlog WHERE target_fullname = %s AND NOT mod = 'SachiMod' LIMIT 1) AND action = 'banuser' AND created_utc > '2020-08-03' AND created_utc < (now() at time zone 'utc') - interval '1 day' ORDER BY created_utc DESC", (removal_suspect.name,))
-    previous_bans = cursor.fetchall()
-    if len(previous_bans) > 0:
-        ban_user(reddit, previous_bans[0][1], duration=14, note=f"Automated ban for breaking the rules after the last ban", ban_message = 'It appears you have created another rule breaking post after being banned previously. Please take some time to familiarize yourself with [our rules](https://www.reddit.com/r/Animemes/wiki/extendedrules) before posting again.', ban_reason="Automated reban")
-        print(f"User: {previous_bans[0][1]} banned for the 2nd time")
+    # cursor.execute("SELECT created_utc, target_author FROM modlog WHERE target_author = (SELECT target_author FROM modlog WHERE target_fullname = %s AND NOT mod = 'SachiMod' LIMIT 1) AND action = 'banuser' AND created_utc > '2020-08-03' AND created_utc < (now() at time zone 'utc') - interval '1 day' ORDER BY created_utc DESC", (removal_suspect.name,))
+    # previous_bans = cursor.fetchall()
+
+    cursor.execute("""SELECT created_utc, target_author, target_fullname
+            FROM modlog
+            WHERE target_author = (SELECT target_author FROM modlog WHERE target_fullname = 't3_iotzr8' LIMIT 1)
+            AND NOT (mod = 'SachiMod' or mod = 'TheVexedGermanBot' or mod = 'LucyHeartfilia_Bot' or mod = 'AutoModerator')
+            AND action = 'removelink'
+            AND created_utc > '2020-09-08'
+            AND NOT EXISTS (SELECT id FROM posts WHERE id = SUBSTRING(modlog.target_fullname, 4) AND link_flair_template_id = '094ce764-898a-11e9-b1bf-0e66eeae092c' )
+            ORDER BY created_utc""",
+            (removal_suspect.name,))
+
+    removals = cursor.fetchall()
+    if len(removals) > 1:
+        cursor.execute("SELECT target_author, description, details FROM modlog WHERE action = 'banuser' AND mod = 'SachiMod' AND created_utc > '2020-09-08'")
+        previous_bans = cursor.fetchall()
+        ban_length = [1, 3, 7, 14, 30, 0][len(previous_bans)]
+        # Make sure user is not banned already
+        if not list(reddit.subreddit("Animemes").banned(removals[0][1])):
+            ban_user(reddit, removals[0][1], duration=ban_length, note=f"Automated ban for repeatedly breaking the rules", ban_message = f'It appears you have created another rule breaking post after being {"warned" if len(previous_bans) == 0 else "banned"} previously. {"Please take some time to familiarize yourself with [our rules](https://www.reddit.com/r/Animemes/wiki/extendedrules) before posting again." if len(previous_bans) < 5 else ""}', ban_reason="Automated ban")
+            print(f"User: {removals[0][1]} banned")
 
 
 def purge_and_clean(removal_suspect, cursor):
@@ -206,7 +223,7 @@ def purge_and_clean(removal_suspect, cursor):
         print(removal_suspect.id)
         cursor.execute("SELECT author FROM posts WHERE id = %s", (removal_suspect.id,))
         author = cursor.fetchone()
-        cur.execute("SELECT client_id FROM client_registration WHERE heartbeat > now() at time zone 'utc' - interval '2 minutes' ORDER BY case when busy then remaining_api_calls end desc, heartbeat desc LIMIT 1")
+        cur.execute("SELECT client_id FROM client_registration ORDER BY case when busy then remaining_api_calls end desc, heartbeat desc LIMIT 1")
         client_id = cur.fetchone()
         print(author)
         print(client_id)
