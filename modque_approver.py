@@ -195,7 +195,8 @@ def automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect):
             AND NOT (mod = 'SachiMod' or mod = 'TheVexedGermanBot' or mod = 'LucyHeartfilia_Bot' or mod = 'AutoModerator')
             AND action = 'removelink'
             AND created_utc > '2020-09-08'
-            AND NOT EXISTS (SELECT id FROM posts WHERE id = SUBSTRING(modlog.target_fullname, 4) AND link_flair_template_id = '094ce764-898a-11e9-b1bf-0e66eeae092c' )
+            AND NOT EXISTS (SELECT id FROM posts WHERE id = SUBSTRING(modlog.target_fullname, 4) AND link_flair_template_id = '094ce764-898a-11e9-b1bf-0e66eeae092c')
+            AND EXISTS (SELECT id FROM posts WHERE id = SUBSTRING(modlog.target_fullname, 4) AND link_flair_template_id IS NOT NULL)
             ORDER BY created_utc""",
             (removal_suspect.name,))
 
