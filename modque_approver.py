@@ -191,7 +191,7 @@ def automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect):
 
     cursor.execute("""SELECT created_utc, target_author, target_fullname
             FROM modlog
-            WHERE target_author = (SELECT target_author FROM modlog WHERE target_fullname = 't3_iotzr8' LIMIT 1)
+            WHERE target_author = (SELECT target_author FROM modlog WHERE target_fullname = %s LIMIT 1)
             AND NOT (mod = 'SachiMod' or mod = 'TheVexedGermanBot' or mod = 'LucyHeartfilia_Bot' or mod = 'AutoModerator')
             AND action = 'removelink'
             AND created_utc > '2020-09-08'
