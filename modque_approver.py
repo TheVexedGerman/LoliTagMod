@@ -202,7 +202,7 @@ def automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect):
 
     removals = cursor.fetchall()
     if len(removals) > 1:
-        cursor.execute("SELECT target_author, description, details FROM modlog WHERE action = 'banuser' AND mod = 'SachiMod' AND created_utc > '2020-09-08'")
+        cursor.execute("SELECT target_author, description, details FROM modlog WHERE action = 'banuser' AND mod = 'SachiMod' AND created_utc > '2020-09-08' and target_author = %s", (removals[0][1],))
         previous_bans = cursor.fetchall()
         ban_length = [1, 3, 7, 14, 30, 0][len(previous_bans)]
         # Make sure user is not banned already
