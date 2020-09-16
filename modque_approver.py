@@ -189,7 +189,7 @@ def automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect):
     # cursor.execute("SELECT created_utc, target_author FROM modlog WHERE target_author = (SELECT target_author FROM modlog WHERE target_fullname = %s AND NOT mod = 'SachiMod' LIMIT 1) AND action = 'banuser' AND created_utc > '2020-08-03' AND created_utc < (now() at time zone 'utc') - interval '1 day' ORDER BY created_utc DESC", (removal_suspect.name,))
     # previous_bans = cursor.fetchall()
 
-    cursor.execute("""SELECT created_utc, target_author, target_fullname
+    cursor.execute("""SELECT DISTINCT ON (target_fullname) target_fullname, target_author, created_utc
             FROM modlog
             WHERE target_author = (SELECT target_author FROM modlog WHERE target_fullname = %s LIMIT 1)
             AND NOT (mod = 'SachiMod' or mod = 'TheVexedGermanBot' or mod = 'LucyHeartfilia_Bot' or mod = 'AutoModerator')
@@ -197,7 +197,7 @@ def automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect):
             AND created_utc > '2020-09-08'
             AND NOT EXISTS (SELECT id FROM posts WHERE id = SUBSTRING(modlog.target_fullname, 4) AND link_flair_template_id = '094ce764-898a-11e9-b1bf-0e66eeae092c')
             AND EXISTS (SELECT id FROM posts WHERE id = SUBSTRING(modlog.target_fullname, 4) AND link_flair_template_id IS NOT NULL)
-            ORDER BY created_utc""",
+            ORDER BY target_fullname""",
             (removal_suspect.name,))
 
     removals = cursor.fetchall()
