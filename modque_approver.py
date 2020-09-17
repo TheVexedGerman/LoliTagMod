@@ -175,7 +175,7 @@ def update_flairs_in_the_db(reddit, cursor, db_conn):
             # automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect)
 
             # Clean users with the proper flairs
-            purge_and_clean(removal_suspect, cursor)
+            # purge_and_clean(removal_suspect, cursor)
 
             # Feed the event removals mirror db
             event_removal_db_update(removal_suspect, cursor)
