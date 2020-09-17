@@ -172,7 +172,7 @@ def update_flairs_in_the_db(reddit, cursor, db_conn):
                 continue
             cursor.execute("UPDATE posts SET link_flair_template_id = %s, link_flair_text = %s WHERE id = %s", (removal_suspect.link_flair_template_id, removal_suspect.link_flair_text, removal_suspect.id))
             # Automated bans
-            automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect)
+            # automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect)
 
             # Clean users with the proper flairs
             purge_and_clean(removal_suspect, cursor)
