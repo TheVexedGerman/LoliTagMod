@@ -61,10 +61,6 @@ def authenticate():
         # 'lolitagmod'
         )
     print("Authenticated as {}".format(reddit.user.me()))
-    # reddit2 = praw.Reddit(
-    #     'hentaimemesmod'
-    #     )
-    # print("Authenticated as {}".format(reddit2.user.me()))
     return reddit
 
 
