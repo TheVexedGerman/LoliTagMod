@@ -496,7 +496,7 @@ def edited_comments_loop(reddit, subreddit, cursor, db_conn):
 
         # Remove any comment that if newer than the latest_edited
         comment.mod.remove()
-        if comment.id == latest_edited[0] and convert_time(comment.created_utc) == latest_edited[1]:
+        if latest_edited and comment.id == latest_edited[0] and convert_time(comment.created_utc) == latest_edited[1]:
             break
 
 def run_bot(reddit, cursor, db_conn):
