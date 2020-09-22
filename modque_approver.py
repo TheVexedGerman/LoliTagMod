@@ -496,7 +496,7 @@ def edited_comments_loop(reddit, subreddit, cursor, db_conn):
 
         # Remove any comment that if newer than the latest_edited
         # skip any comment older than the latest in the db
-        if latest_edited and comment.id == latest_edited[0] and convert_time(comment.created_utc) == latest_edited[1]:
+        if latest_edited and comment.id == latest_edited[0] and convert_time(comment.edited) == latest_edited[1]:
             break
         comment.mod.remove()
         cursor.execute("INSERT INTO edited_comments_repo (comment_id, comment_edited, comment_body, parent_post_id, comment_username) VALUES (%s, %s, %s, %s, %s)", (comment.id, convert_time(comment.edited), comment.body, comment.submission.id, str(comment.author)))
