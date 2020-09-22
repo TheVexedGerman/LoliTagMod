@@ -112,8 +112,8 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
                 continue
 
             # check of the comment has a broken spoiler
-            if check_for_broken_comment_spoilers(item):
-                continue
+            # if check_for_broken_comment_spoilers(item):
+            #     continue
 
             # remove comments from shadowbanned users and leave a comment for those users.
             if remove_shadowbanned_comments(item):
@@ -488,9 +488,9 @@ def edited_comments_loop(reddit, subreddit, cursor, db_conn):
     cursor.execute("SELECT comment_id, comment_edited FROM edited_comments_repo ORDER BY comment_edited desc")
     latest_edited = cursor.fetchone()
     for comment in reddit.subreddit(subreddit).mod.edited(only='comments', limit=100):
-        # Check for older edited spoiler tag broken comments
-        if comment.id in list(spoiler_comment_dict.keys()):
-            check_if_broken_spoiler_is_fixed_and_approve(comment)
+        # # Check for older edited spoiler tag broken comments
+        # if comment.id in list(spoiler_comment_dict.keys()):
+        #     check_if_broken_spoiler_is_fixed_and_approve(comment)
 
         # Remove any comment that if newer than the latest_edited
         comment.mod.remove()
@@ -535,7 +535,7 @@ def run_bot(reddit, cursor, db_conn):
 
     print("Checking for edited broken spoiler comments")
     # check comments that are too new to show up in edited for spoiler updates
-    check_for_updated_comments(reddit)
+    # check_for_updated_comments(reddit)
     print("Sleeping for 30 seconds...")
     time.sleep(30)
 
