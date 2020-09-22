@@ -76,6 +76,9 @@ def main():
     # Initialize the dictionary for spoiler comments which have been formatted incorrectly
     global spoiler_comment_dict
     spoiler_comment_dict = load_spoiler_dict()
+    # get the mods of the sub so you can ignore them
+    global subreddit_moderators
+    subreddit_moderators = reddit.subreddit(PARSED_SUBREDDIT).moderator()
 
     # run_bot()
     while True:
@@ -484,13 +487,16 @@ def edited_comments_loop(reddit, subreddit, cursor, db_conn):
     cursor.execute("SELECT comment_id, comment_edited FROM edited_comments_repo ORDER BY comment_edited desc")
     latest_edited = cursor.fetchone()
     for comment in reddit.subreddit(subreddit).mod.edited(only='comments', limit=100):
+        # Skip handling if the comment is made by a sub mod
+        if comment.author in subreddit_moderators:
+            continue
         # # Check for older edited spoiler tag broken comments
         # if comment.id in list(spoiler_comment_dict.keys()):
         #     check_if_broken_spoiler_is_fixed_and_approve(comment)
 
         # Remove any comment that if newer than the latest_edited
         comment.mod.remove()
-        if comment.id == latest_edited[0] and if convert_time(comment.created_utc) == latest_edited[1]:
+        if comment.id == latest_edited[0] and convert_time(comment.created_utc) == latest_edited[1]:
             break
 
 def run_bot(reddit, cursor, db_conn):
