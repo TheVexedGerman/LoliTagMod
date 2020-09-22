@@ -484,9 +484,20 @@ def check_for_improper_title_spoiler_marks(submission):
                 return True
     return False
 
+def edited_comments_loop(reddit, subreddit, cursor, db_conn):
+    cursor.execute("SELECT comment_id, comment_edited FROM edited_comments_repo ORDER BY comment_edited desc")
+    latest_edited = cursor.fetchone()
+    for comment in reddit.subreddit(subreddit).mod.edited(only='comments', limit=100):
+        # Check for older edited spoiler tag broken comments
+        if comment.id in list(spoiler_comment_dict.keys()):
+            check_if_broken_spoiler_is_fixed_and_approve(comment)
+
+        # Remove any comment that if newer than the latest_edited
+        comment.mod.remove()
+        if comment.id == latest_edited[0] and if convert_time(comment.created_utc) == latest_edited[1]:
+            break
 
 def run_bot(reddit, cursor, db_conn):
-    #TODO hentaimemes part.
     print("Current time: " + str(datetime.datetime.now().time()))
     # modqueue loop
     print("Fetching modqueue...")
@@ -518,21 +529,12 @@ def run_bot(reddit, cursor, db_conn):
     # hot posts loop
     print("Checking hot posts")
     hot_posts_loop(reddit, "Animemes", cursor, db_conn)
-
-    # print("Checking hentaimemes queue comments")
-    # for comment in reddit2.subreddit('hentaimemes').mod.modqueue(only='comments', limit=None):
-    #     print(comment.body)
-    #     has_numbers, has_redaction = check_for_violation(comment.body)
-    #     if has_numbers:
-    #         if not has_redaction:
-    #             print("Approving Comment")
-    #             comment.mod.approve()
-    #         else:
-    #             print("Removing Comment")
-    #             comment.mod.remove(spam=False)
     
+    print("Checking edited comments")
+    edited_comments_loop(reddit, "Animemes", cursor, db_conn)
+
     print("Checking for edited broken spoiler comments")
-    # possible rewrite to account for the edited comment loop.
+    # check comments that are too new to show up in edited for spoiler updates
     check_for_updated_comments(reddit)
     print("Sleeping for 30 seconds...")
     time.sleep(30)
@@ -797,22 +799,18 @@ def check_for_updated_comments(reddit):
     for comment_id in list(spoiler_comment_dict.keys()):
         if spoiler_comment_dict[comment_id] + datetime.timedelta(minutes=3) < datetime.datetime.now():
             comment = reddit.comment(id=comment_id)
-            broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
-            if not broken_spoiler:
-                comment.mod.approve()
-                del spoiler_comment_dict[comment.id]
-    # Check for older edited comments
-    for comment in reddit.subreddit(PARSED_SUBREDDIT).mod.edited(only='comments', limit=100):
-        if comment.id in list(spoiler_comment_dict.keys()):
-            broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
-            if not broken_spoiler:
-                comment.mod.approve()
-                del spoiler_comment_dict[comment.id]
+            check_if_broken_spoiler_is_fixed_and_approve(comment)
     # clean up old comments that are unlikely to be edited.
     for key in list(spoiler_comment_dict.keys()):
         if spoiler_comment_dict[key] < (datetime.datetime.now() - datetime.timedelta(days=1)):
             del spoiler_comment_dict[key]
     save_spoiler_dict(spoiler_comment_dict)
+
+def check_if_broken_spoiler_is_fixed_and_approve(comment):
+    broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
+    if not broken_spoiler:
+        comment.mod.approve()
+        del spoiler_comment_dict[comment.id]
 
 
 if __name__ == '__main__':
