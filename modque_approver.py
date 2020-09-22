@@ -116,8 +116,8 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
             #     continue
 
             # remove comments from shadowbanned users and leave a comment for those users.
-            if remove_shadowbanned_comments(item):
-                continue
+            # if remove_shadowbanned_comments(item):
+            #     continue
 
         # do post loops acttions
         elif item.name[:2] == 't3':
