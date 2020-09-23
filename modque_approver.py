@@ -499,7 +499,7 @@ def edited_comments_loop(reddit, subreddit, cursor, db_conn):
         # skip any comment and newer that already has an entry
         try:
             cursor.execute("INSERT INTO edited_comments_repo (comment_id, comment_edited, comment_body, parent_post_id, comment_username) VALUES (%s, %s, %s, %s, %s)", (comment.id, convert_time(comment.edited), comment.body, comment.submission.id, str(comment.author)))
-            db_conn.commit
+            db_conn.commit()
             comment.mod.remove()
         except psycopg2.errors.UniqueViolation:
             db_conn.rollback()
@@ -609,14 +609,6 @@ def authenticate_db():
     user = postgres_credentials_modque.USER,
     password = postgres_credentials_modque.PASSWORD
     )
-    # db_conn2 = psycopg2.connect(
-    # host = postgres_credentials_modque.HOST,
-    # database = 'hentaimemes',
-    # user = postgres_credentials_modque.USER,
-    # password = postgres_credentials_modque.PASSWORD
-    # )   
-
-    # return db_conn, db_conn.cursor(), db_conn2, db_conn2.cursor()
     return db_conn, db_conn.cursor()
 
 
