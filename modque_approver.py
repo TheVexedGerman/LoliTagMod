@@ -546,6 +546,8 @@ def run_bot(reddit, cursor, db_conn):
     print("Checking for edited broken spoiler comments")
     # check comments that are too new to show up in edited for spoiler updates
     # check_for_updated_comments(reddit)
+
+    print(reddit.auth.limits)
     print("Sleeping for 30 seconds...")
     time.sleep(30)
 
