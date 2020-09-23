@@ -7,6 +7,7 @@ import re
 import datetime
 import json
 import psycopg2
+import psycopg2.errors
 import traceback
 #imports the site wrappers for the sites from the nhentai bot
 import wrapper.nhentai as nhentai
@@ -484,8 +485,8 @@ def check_for_improper_title_spoiler_marks(submission):
     return False
 
 def edited_comments_loop(reddit, subreddit, cursor, db_conn):
-    cursor.execute("SELECT comment_id, comment_edited FROM edited_comments_repo ORDER BY comment_edited desc")
-    latest_edited = cursor.fetchone()
+    # cursor.execute("SELECT comment_id, comment_edited FROM edited_comments_repo ORDER BY comment_edited desc")
+    # latest_edited = cursor.fetchone()
     for comment in reddit.subreddit(subreddit).mod.edited(only='comments', limit=100):
         # Skip handling if the comment is made by a sub mod
         if comment.author in subreddit_moderators:
@@ -495,12 +496,16 @@ def edited_comments_loop(reddit, subreddit, cursor, db_conn):
         #     check_if_broken_spoiler_is_fixed_and_approve(comment)
 
         # Remove any comment that if newer than the latest_edited
-        # skip any comment older than the latest in the db
-        if latest_edited and comment.id == latest_edited[0] and convert_time(comment.edited) == latest_edited[1]:
+        # skip any comment and newer that already has an entry
+        try:
+            cursor.execute("INSERT INTO edited_comments_repo (comment_id, comment_edited, comment_body, parent_post_id, comment_username) VALUES (%s, %s, %s, %s, %s)", (comment.id, convert_time(comment.edited), comment.body, comment.submission.id, str(comment.author)))
+            db_conn.commit
+            comment.mod.remove()
+        except psycopg2.errors.UniqueViolation:
+            db_conn.rollback()
             break
-        comment.mod.remove()
-        cursor.execute("INSERT INTO edited_comments_repo (comment_id, comment_edited, comment_body, parent_post_id, comment_username) VALUES (%s, %s, %s, %s, %s)", (comment.id, convert_time(comment.edited), comment.body, comment.submission.id, str(comment.author)))
-    db_conn.commit
+        # if latest_edited and comment.id == latest_edited[0] and convert_time(comment.edited) == latest_edited[1]:
+        #     break
 
 def run_bot(reddit, cursor, db_conn):
     print("Current time: " + str(datetime.datetime.now().time()))
