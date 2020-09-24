@@ -412,7 +412,7 @@ def new_posts_loop(reddit, subreddit, cursor, db_conn):
         # check_for_nsfw_tagging(submission)
 
         # Check if the image is below the minimum resolution
-        if check_for_minimum_image_size(submission):
+        if check_for_minimum_image_size(submission, cursor):
             continue
 
     global new_post_list
