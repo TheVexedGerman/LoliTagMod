@@ -441,7 +441,7 @@ def post_new_posts_loop(new_post_list, current_new_post_list, cursor):
 def check_for_minimum_image_size(submission, cursor):
     cursor.execute("SELECT count(*) FROM sachimod_ignore_posts WHERE id = %s", (submission.id,))
     skip_count = cursor.fetchone()
-    if skip_count and skip_count > 0:
+    if skip_count and skip_count[0] > 0:
         return False
     # cursor.execute("SELECT id FROM sachimod_ignore_posts WHERE created_utc > %s", (datetime.datetime.now()-datetime.timedelta(days=1),))
     # stored_ignore = cursor.fetchall()
@@ -455,7 +455,7 @@ def check_for_minimum_image_size(submission, cursor):
                     res = submission.preview['images'][0]
                     if res['source']['height'] * res['source']['width'] < 100000:
                         submission.mod.remove()
-                        submission.flair.select('c87c2ac6-1dd4-11ea-9a24-0ea0ae2c9561', text="Rule 10: Post Quality - Low Res")
+                        submission.flair.select('c87c2ac6-1dd4-11ea-9a24-0ea0ae2c9561', text="Rule 6: Post Quality - Low Res")
                         return True
             except:
                 print(traceback.format_exc())
