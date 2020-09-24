@@ -440,7 +440,7 @@ def post_new_posts_loop(new_post_list, current_new_post_list, cursor):
 
 def check_for_minimum_image_size(submission, cursor):
     cursor.execute("SELECT count(*) FROM sachimod_ignore_posts WHERE id = %s", (submission.id,))
-    skip_count = cursor.fetchrow()
+    skip_count = cursor.fetchone()
     if skip_count and skip_count > 0:
         return False
     # cursor.execute("SELECT id FROM sachimod_ignore_posts WHERE created_utc > %s", (datetime.datetime.now()-datetime.timedelta(days=1),))
