@@ -438,7 +438,16 @@ def post_new_posts_loop(new_post_list, current_new_post_list, cursor):
     # set the new list to be the one checked next time
     return current_new_post_list
 
-def check_for_minimum_image_size(submission):
+def check_for_minimum_image_size(submission, cursor):
+    cursor.execute("SELECT count(*) FROM sachimod_ignore_posts WHERE id = %s", (submission.id,))
+    skip_count = cursor.fetchrow()
+    if skip_count and skip_count > 0:
+        return False
+    # cursor.execute("SELECT id FROM sachimod_ignore_posts WHERE created_utc > %s", (datetime.datetime.now()-datetime.timedelta(days=1),))
+    # stored_ignore = cursor.fetchall()
+    # if stored_ignore:
+    #     ignore_list = [entry[0] for entry in stored_ignore]
+    # if submission.id not in ignore_list:
     try:
         if submission.preview:
             try:
