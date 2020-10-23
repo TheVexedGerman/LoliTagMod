@@ -98,7 +98,7 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
 
             # automatically approve comments where the Sleuth couldn't find a repost
             if item.author.name == 'RepostSleuthBot':
-                if "I didn't find any posts that meet the matching requirements" in item.body:
+                if "I didn't find any posts that meet the matching requirements for r/Animemes.\n\nIt might be OC, it might not." in item.body:
                     item.mod.approve()
                     continue
 
