@@ -133,6 +133,7 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
 
 
 def modlog_loop(reddit, subreddit, cursor, db_conn):
+    curr_actions = []
     for action in reddit.subreddit(subreddit).mod.log(limit=None):
         update_watched_id_set(action, cursor, db_conn)
         cursor.execute("SELECT * FROM modlog WHERE id = %s", [action.id])
@@ -141,6 +142,19 @@ def modlog_loop(reddit, subreddit, cursor, db_conn):
             break
         cursor.execute("INSERT INTO modlog (action, created_utc, description, details, id, mod, mod_id36, sr_id36, subreddit, subreddit_name_prefixed, target_author, target_body, target_fullname, target_permalink, target_title) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (action.action, convert_time(action.created_utc), action.description, action.details, action.id, str(action.mod), action.mod_id36, action.sr_id36, action.subreddit, action.subreddit_name_prefixed, str(action.target_author), action.target_body, action.target_fullname, action.target_permalink, action.target_title))
         db_conn.commit()
+        curr_actions.append(action)
+    curr_actions.reverse()
+    for action in curr_actions:
+        update_user_comment_approvals(action, cursor, db_conn)
+
+
+def update_user_comment_approvals(action, cursor, db_conn):
+    robots = ['AutoModerator', 'SachiMod']
+    if str(action.mod) not in robots:
+        if action.action in ['removecomment', 'approvecomment']:
+            cursor.execute("INSERT INTO comment_removals (target_fullname, author, created_utc, approved) VALUES (%s, %s, %s, %s) ON CONFLICT (target_fullname) DO UPDATE SET created_utc = EXCLUDED.created_utc, approved = EXCLUDED.approved", (action.target_fullname, str(action.target_author), convert_time(action.created_utc), (action.action == 'approvecomment')))
+
+        
 
 def update_watched_id_set(action, cursor, db_conn):
     if watched_id_set:
