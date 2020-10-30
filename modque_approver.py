@@ -149,7 +149,7 @@ def modlog_loop(reddit, subreddit, cursor, db_conn):
 
 
 def update_user_comment_approvals(action, cursor, db_conn):
-    robots = ['AutoModerator', 'SachiMod']
+    robots = ['AutoModerator', 'SachiMod', 'AnimemesBot']
     if str(action.mod) not in robots:
         if action.action in ['removecomment', 'approvecomment']:
             cursor.execute("INSERT INTO comment_removals (target_fullname, author, created_utc, approved) VALUES (%s, %s, %s, %s) ON CONFLICT (target_fullname) DO UPDATE SET created_utc = EXCLUDED.created_utc, approved = EXCLUDED.approved", (action.target_fullname, str(action.target_author), convert_time(action.created_utc), (action.action == 'approvecomment')))
