@@ -307,7 +307,7 @@ def approve_non_ninja_simple_comments(comment):
     reported_by_sachi = comment.mod_reports and any(mod_report[1] == "SachiMod" and "Auto whitelist comment" in mod_report[0] for mod_report in comment.mod_reports)
     try:
         if comment.banned_by:
-            fitlered_by_automod == comment.banned_by == 'AutoModerator'
+            fitlered_by_automod = comment.banned_by == 'AutoModerator'
     except:
         pass
     if comment.user_reports:
