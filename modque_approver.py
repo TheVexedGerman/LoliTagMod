@@ -108,8 +108,8 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
                 continue
 
             # check if the comment is linking to loli content
-            # if check_for_sholi_links(item):
-            #     continue
+            if check_for_sholi_links(item):
+                continue
 
             # check of the comment has a broken spoiler
             # if check_for_broken_comment_spoilers(item):
@@ -357,8 +357,8 @@ def check_for_sholi_links(comment):
     has_numbers, has_redaction = check_for_violation(comment.body)
     if has_numbers:
         if not has_redaction:
-            print("Approving Comment")
-            comment.mod.approve()
+            # print("Approving Comment")
+            # comment.mod.approve()
             return True
         else:
             print("Removing Comment")
