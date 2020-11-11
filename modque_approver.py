@@ -55,6 +55,172 @@ This was not an action taken by the /r/Animemes mods, but a site admin for somet
 {COMMENT_FOOTER}"""
 
 
+common_phrases_list = [
+    "sauce?",
+    "u/savethisvideo",
+    "a",
+    "same",
+    "yes",
+    "sauce",
+    "u/vredditdownloader",
+    "thanks",
+    "u/repostsleuthbot",
+    "no",
+    "f",
+    "nice",
+    "what the fuck",
+    "repost",
+    "lol",
+    "thank you",
+    "bruh",
+    "happy cake day",
+    "ok",
+    "true",
+    "lmao",
+    "?",
+    "oh no",
+    "thx",
+    "yeah",
+    "good bot",
+    "{attack on titan}",
+    "b",
+    "yes.",
+    "happy cake day!",
+    "indeed",
+    "noice",
+    "what",
+    "relatable",
+    "thanks!",
+    "thank you!",
+    "agreed",
+    "anime?",
+    "always has been",
+    "genshin impact",
+    "what anime is this?",
+    "yep",
+    "exactly",
+    "wtf",
+    "konosuba",
+    "why?",
+    "based",
+    "do",
+    "me too",
+    "sauce ?",
+    "so true",
+    "thank you jesus",
+    "go to horny jail",
+    "smol echidna",
+    "what?",
+    "emergency food",
+    "oh",
+    "oof",
+    "sause",
+    "simp",
+    "why",
+    ".",
+    "hmm",
+    "mood",
+    "no u",
+    "r/holup",
+    "sauce pls",
+    "even better",
+    "facts",
+    "fire force",
+    "g",
+    "gabriel dropout",
+    "me",
+    "no.",
+    "overflow",
+    "sauce please",
+    "what anime is this",
+    "177013",
+    "bonk",
+    "cringe",
+    "hi",
+    "hol up",
+    "k",
+    "pog",
+    "r/cursedcomments",
+    "same here",
+    "test",
+    "thank you.",
+    ":(",
+    "a.",
+    "fuck",
+    "goblin slayer",
+    "good",
+    "hehe",
+    "ikr",
+    "latom",
+    "r/repostsleuthbot",
+    "source?",
+    "x",
+    "yea",
+    "y e s",
+    "yup",
+    "あ",
+    "both is good",
+    "e",
+    "fate",
+    "i agree",
+    "n",
+    "r/hornyjail",
+    "sause?",
+    "thanks man",
+    "very noice",
+    "wait what",
+    "weak",
+    "weathering with you",
+    "wha",
+    "xd",
+    "yes it is",
+    "326395",
+    "amen",
+    "ara ara",
+    "bad bot",
+    "damn",
+    "hell yeah",
+    "i don't know enough to answer you yet!",
+    "i know",
+    "is it good?",
+    "rip",
+    "stop",
+    "this",
+    "what anime is this from?",
+    "😂",
+    "charlotte",
+    "fair enough",
+    "fbi open up",
+    "good question",
+    "h",
+    "holy shit",
+    "is it possible to learn this power?",
+    "maybe",
+    "nisekoi",
+    "not my proudest fap",
+    "rent a girlfriend",
+    "re zero",
+    "sauces?",
+    "t",
+    "u/repostsleuthbot watch",
+    "what anime is that?",
+    "who?",
+    "why must you hurt me in this way",
+    "why not both?",
+    "amazing",
+    "angel beats",
+    "another",
+    "birdy the mighty",
+    "black clover",
+    "darling in the franxx",
+    "good meme",
+    "both, both is good",
+    "f, same",
+    """{attack on titan}
+
+u/roboragi"""
+]
+
 def authenticate():
     print("Authenticating...")
     reddit = praw.Reddit(
@@ -111,6 +277,10 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
             if check_for_sholi_links(item):
                 continue
 
+            # approve a comment if it is older than 3 minutes and contains a simple phrase
+            if approve_non_ninja_simple_comments(item):
+                continue
+
             # check of the comment has a broken spoiler
             # if check_for_broken_comment_spoilers(item):
             #     continue
@@ -130,6 +300,23 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
 
             # Automatically approve memes that got reported for not having a spoiler, but have gotten tagged in the meantime.
             approve_flagged_but_now_spoiler_tagged_memes(item)
+
+
+def approve_non_ninja_simple_comments(comment):
+    try:
+        if comment.banned_by:
+            pass
+    except:
+        return False
+    if comment.banned_by != 'AutoModerator':
+        return False
+    if convert_time(comment.created_utc) + datetime.timedelta(minutes=3) > datetime.datetime.now():
+        return False
+    if comment.body.lower() in common_phrases_list:
+        print(f"Approving common phrase: {comment.body}")
+        comment.mod.approve()
+        return True
+    
 
 
 def modlog_loop(reddit, subreddit, cursor, db_conn):
