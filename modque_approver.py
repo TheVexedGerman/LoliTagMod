@@ -218,7 +218,15 @@ common_phrases_list = [
     "f, same",
     """{attack on titan}
 
-u/roboragi"""
+u/roboragi""",
+    "r/egg_irl",
+    "worth it",
+    "waifu",
+    "uwu",
+    "...",
+    "both, both is good.",
+    "lmfao",
+    "u/savevideo"
 ]
 
 def authenticate():
