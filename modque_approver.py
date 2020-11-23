@@ -311,19 +311,14 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
 
 
 def approve_non_ninja_simple_comments(comment):
-    fitlered_by_automod = False
-    reported_by_sachi = comment.mod_reports and any(mod_report[1] == "SachiMod" and "Auto whitelist comment" in mod_report[0] for mod_report in comment.mod_reports)
-    try:
-        if comment.banned_by:
-            fitlered_by_automod = comment.banned_by == 'AutoModerator'
-    except:
-        pass
     if comment.user_reports:
         return False
     if convert_time(comment.created_utc) + datetime.timedelta(minutes=3) > datetime.datetime.now():
         return False
+    reported_by_automod = comment.mod_reports and any(mod_report[1] == 'AutoModerator' and 'Comments require manual review' in mod_report[0] for mod_report in comment.mod_reports)
+    reported_by_sachi = comment.mod_reports and any(mod_report[1] == "SachiMod" and "manually approved" in mod_report[0] for mod_report in comment.mod_reports)
 
-    if fitlered_by_automod or reported_by_sachi:
+    if reported_by_automod or (reported_by_automod and reported_by_sachi):
         if comment.body.lower() in common_phrases_list:
             print(f"Approving common phrase: {comment.body}")
             comment.mod.approve()
