@@ -226,7 +226,18 @@ u/roboragi""",
     "...",
     "both, both is good.",
     "lmfao",
-    "u/savevideo"
+    "u/savevideo",
+    "just monika",
+    "bro",
+    "🥒",
+    "#a",
+    "# a",
+    "bro...",
+    "gawr gura",
+    "this is the way",
+    "yankee jk kuzuhana-chan",
+    "fax",
+    "this is... the power of ^(*a jojo part 5 spoiler*) >![requiem](https://youtu.be/qs3t2pe4zse?t=122)!<."
 ]
 
 def authenticate():
