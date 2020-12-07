@@ -319,6 +319,9 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
 
             # Automatically approve memes that got reported for not having a spoiler, but have gotten tagged in the meantime.
             approve_flagged_but_now_spoiler_tagged_memes(item)
+        
+        #update user flairs with changes.
+        check_flairs_and_update_if_different(item, cursor, db_conn)
 
 
 def approve_non_ninja_simple_comments(comment):
@@ -590,11 +593,14 @@ def check_for_broken_comment_spoilers(comment):
 def gilded_posts_loop(reddit, subreddit, cursor, db_conn):
     for post in reddit.subreddit(subreddit).gilded(limit=100):
         update_awards(post, reddit, cursor, db_conn)
+        check_flairs_and_update_if_different(post, cursor, db_conn)
 
 
 def hot_posts_loop(reddit, subreddit, cursor, db_conn):
     for post in reddit.subreddit(subreddit).hot(limit=100):
         update_awards(post, reddit, cursor, db_conn)
+        #update user flairs with changes.
+        check_flairs_and_update_if_different(post, cursor, db_conn)
 
 
 def update_awards(post, reddit, cursor, db_conn):
@@ -735,6 +741,13 @@ def edited_comments_loop(reddit, subreddit, cursor, db_conn):
             break
         # if latest_edited and comment.id == latest_edited[0] and convert_time(comment.edited) == latest_edited[1]:
         #     break
+
+        #update user flairs with changes.
+        check_flairs_and_update_if_different(comment, cursor, db_conn)
+
+def comments_loop(reddit, subreddit, cursor, db_conn):
+    for comment in reddit.subreddit(subreddit).comments(limit=100):
+        check_flairs_and_update_if_different(item, cursor, db_conn)
 
 def run_bot(reddit, cursor, db_conn):
     print("Current time: " + str(datetime.datetime.now().time()))
@@ -1044,6 +1057,14 @@ def check_if_broken_spoiler_is_fixed_and_approve(comment):
     if not broken_spoiler:
         comment.mod.approve()
         del spoiler_comment_dict[comment.id]
+
+def check_flairs_and_update_if_different(flair_item, cursor, db_conn):
+    if flair_item.author_flair_css_class or flair_item.author_flair_text:
+        cursor.execute("SELECT flair_text, flair_css_class FROM user_flairs WHERE redditor = %s", (flair_item.author,))
+        exists = cursor.fetchone()
+        if exists and (exists[0] != flair_item.author_flair_text or exists[1] != flair_item.author_flair_css_class):
+            cursor.execute("INSERT INTO user_flairs (redditor, flair_text, flair_css_class) VALUES (%s, %s, %s) ON CONFLICT (redditor) DO UPDATE SET redditor = EXCLUDED.redditor, flair_text = EXCLUDED.flair_text, flair_css_class = EXCLUDED.flair_css_class, sent_to_discord = False", (str(flair_item.author), flair_item.author_flair_text, flair_item.author_flair_css_class))
+            db_conn.commit()
 
 
 if __name__ == '__main__':
