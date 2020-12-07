@@ -276,21 +276,25 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
         # do comment loops actions
         if item.name[:2] == 't1':
             print(item.body)
-            # automatically approve comments made by the bot
-            if item.author.name == 'AnimemesBot' or item.author.name == 'AutoModerator':
-                item.mod.approve()
-                continue
+            
+            # skip if author has no name
+            if item.author:
 
-            # automatically approve comments where the Sleuth couldn't find a repost
-            if item.author.name == 'RepostSleuthBot':
-                if "I didn't find any posts that meet the matching requirements for r/Animemes. \n\nIt might be OC, it might not." in item.body:
+                # automatically approve comments made by the bot
+                if item.author.name == 'AnimemesBot' or item.author.name == 'AutoModerator':
                     item.mod.approve()
                     continue
 
-            if item.author.name == 'DupeBro':
-                print('checking for similar matches with DupeBro')
-                check_dupebro_for_redundant_info(item)
-                continue
+                # automatically approve comments where the Sleuth couldn't find a repost
+                if item.author.name == 'RepostSleuthBot':
+                    if "I didn't find any posts that meet the matching requirements for r/Animemes. \n\nIt might be OC, it might not." in item.body:
+                        item.mod.approve()
+                        continue
+
+                if item.author.name == 'DupeBro':
+                    print('checking for similar matches with DupeBro')
+                    check_dupebro_for_redundant_info(item)
+                    continue
 
             # check if the comment is linking to loli content
             if check_for_sholi_links(item):
