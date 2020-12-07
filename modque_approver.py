@@ -1070,6 +1070,9 @@ def check_flairs_and_update_if_different(flair_item, cursor, db_conn):
         if exists and (exists[0] != flair_text or exists[1] != flair_css_class):
             cursor.execute("INSERT INTO user_flairs (redditor, flair_text, flair_css_class) VALUES (%s, %s, %s) ON CONFLICT (redditor) DO UPDATE SET redditor = EXCLUDED.redditor, flair_text = EXCLUDED.flair_text, flair_css_class = EXCLUDED.flair_css_class, sent_to_discord = False", (str(flair_item.author), flair_text, flair_css_class))
             db_conn.commit()
+        elif not exists:
+            cursor.execute("INSERT INTO user_flairs (redditor, flair_text, flair_css_class) VALUES (%s, %s, %s) ON CONFLICT (redditor) DO UPDATE SET redditor = EXCLUDED.redditor, flair_text = EXCLUDED.flair_text, flair_css_class = EXCLUDED.flair_css_class, sent_to_discord = False", (str(flair_item.author), flair_text, flair_css_class))
+            db_conn.commit()
 
 
 if __name__ == '__main__':
