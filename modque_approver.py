@@ -1065,8 +1065,10 @@ def check_flairs_and_update_if_different(flair_item, cursor, db_conn):
     if flair_item.author_flair_css_class or flair_item.author_flair_text:
         cursor.execute("SELECT flair_text, flair_css_class FROM user_flairs WHERE redditor = %s", (str(flair_item.author),))
         exists = cursor.fetchone()
-        if exists and (exists[0] != flair_item.author_flair_text or exists[1] != flair_item.author_flair_css_class):
-            cursor.execute("INSERT INTO user_flairs (redditor, flair_text, flair_css_class) VALUES (%s, %s, %s) ON CONFLICT (redditor) DO UPDATE SET redditor = EXCLUDED.redditor, flair_text = EXCLUDED.flair_text, flair_css_class = EXCLUDED.flair_css_class, sent_to_discord = False", (str(flair_item.author), flair_item.author_flair_text, flair_item.author_flair_css_class))
+        flair_text = flair_item.author_flair_text if flair_item.author_flair_text else ''
+        flair_css_class = flair_item.author_flair_css_class if flair_item.author_flair_css_class else ''
+        if exists and (exists[0] != flair_text or exists[1] != flair_css_class):
+            cursor.execute("INSERT INTO user_flairs (redditor, flair_text, flair_css_class) VALUES (%s, %s, %s) ON CONFLICT (redditor) DO UPDATE SET redditor = EXCLUDED.redditor, flair_text = EXCLUDED.flair_text, flair_css_class = EXCLUDED.flair_css_class, sent_to_discord = False", (str(flair_item.author), flair_text, flair_css_class))
             db_conn.commit()
 
 
