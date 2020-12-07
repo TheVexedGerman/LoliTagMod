@@ -747,7 +747,7 @@ def edited_comments_loop(reddit, subreddit, cursor, db_conn):
 
 def comments_loop(reddit, subreddit, cursor, db_conn):
     for comment in reddit.subreddit(subreddit).comments(limit=100):
-        check_flairs_and_update_if_different(item, cursor, db_conn)
+        check_flairs_and_update_if_different(comment, cursor, db_conn)
 
 def run_bot(reddit, cursor, db_conn):
     print("Current time: " + str(datetime.datetime.now().time()))
@@ -788,6 +788,9 @@ def run_bot(reddit, cursor, db_conn):
     print("Checking for edited broken spoiler comments")
     # check comments that are too new to show up in edited for spoiler updates
     # check_for_updated_comments(reddit)
+
+    print("Checking new comments")
+    comments_loop(reddit, "Animemes", cursor, db_conn)
 
     print(reddit.auth.limits)
     print("Sleeping for 30 seconds...")
