@@ -739,7 +739,7 @@ def edited_comments_loop(reddit, subreddit, cursor, db_conn):
         try:
             cursor.execute("INSERT INTO edited_comments_repo (comment_id, comment_edited, comment_body, parent_post_id, comment_username) VALUES (%s, %s, %s, %s, %s)", (comment.id, convert_time(comment.edited), comment.body, comment.submission.id, str(comment.author)))
             db_conn.commit()
-            comment.mod.remove()
+            # comment.mod.remove()
         except psycopg2.errors.UniqueViolation:
             db_conn.rollback()
             break
