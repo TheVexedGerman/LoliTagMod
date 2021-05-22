@@ -316,7 +316,7 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
         elif item.name[:2] == 't3':
             # if it is the weekend approve reaction memes
             if datetime.datetime.now().weekday() > 4:
-                approve_weekend_reaction_meme_reposts(item, cursor, db_conn)
+                approve_weekend_reaction_meme_reposts(item, reddit)
 
             # Automatically approve memes reported for reaction meme on the weekend.
             approve_weekend_reaction_memes(item, cursor, db_conn)
@@ -890,7 +890,7 @@ def approve_flagged_but_now_spoiler_tagged_memes(reports):
         if reports.spoiler:
             reports.mod.approve()
 
-def approve_weekend_reaction_meme_reposts(reports, reddit, cursor):
+def approve_weekend_reaction_meme_reposts(reports, reddit):
     if not reports.mod_reports:
         return
     if reports.user_reports:
