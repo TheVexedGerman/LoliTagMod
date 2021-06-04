@@ -978,6 +978,33 @@ def modmail_fetcher(reddit, subreddit, cursor, db_conn):
         db_conn.commit()
         message.mark_read()
 
+def new_modmail_fetcher(reddit, subreddit, cursor, db_conn):
+    for conversation in reddit.subreddit(subreddit).modmail.conversations(limit=1000, state='all'):
+        exists = modmail_db_updater(conversation, reddit, cursor, db_conn)
+        if exists:
+            break
+    for conversation in reddit.subreddit(subreddit).modmail.conversations(limit=1000, state='archived'):
+        exists = modmail_db_updater(conversation, reddit, cursor, db_conn)
+        if exists:
+            break
+    for conversation in reddit.subreddit(subreddit).modmail.conversations(limit=1000, state='appeals'):
+        exists = modmail_db_updater(conversation, reddit, cursor, db_conn)
+        if exists:
+            break
+
+def modmail_db_updater(conversation, reddit, cursor, db_conn):
+    message = reddit.inbox.message(conversation.legacy_first_message_id)
+    cursor.execute("SELECT id, replies FROM modmail WHERE id = %s", [message.id])
+    exists = cursor.fetchone()
+    replies = [reply.id for reply in message.replies]
+    if exists and exists[1] == message.replies:
+        return True
+    cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, replies, subject, author, body, dest) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET replies = EXCLUDED.replies, dest = EXCLUDED.dest, sent_to_discord = false", (message.id, convert_time(message.created_utc), message.first_message_name, replies, message.subject, str(message.author), message.body, str(message.dest)))
+    for reply in message.replies:
+        cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, subject, author, parent_id, body) VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), reply.first_message_name, reply.subject, str(reply.author), reply.parent_id, reply.body))
+    db_conn.commit()
+    return False
+
 
 def check_awards_membership(award):
     # just try to see if the key is in the dict
