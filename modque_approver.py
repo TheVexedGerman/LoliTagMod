@@ -570,8 +570,8 @@ def check_for_sholi_links(comment):
     has_numbers, has_redaction = check_for_violation(comment.body)
     if has_numbers:
         if not has_redaction:
-            # print("Approving Comment")
-            # comment.mod.approve()
+            print("Approving Comment")
+            comment.mod.approve()
             return True
         else:
             print("Removing Comment")
@@ -768,7 +768,7 @@ def run_bot(reddit, cursor, db_conn):
 
     # fetch modmail
     print("Fetching Modmail")
-    modmail_fetcher(reddit, "Animemes", cursor, db_conn)
+    new_modmail_fetcher(reddit, "Animemes", cursor, db_conn)
 
     # Update the post flairs in the DB
     print("Updating DB flairs")
