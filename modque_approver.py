@@ -1001,9 +1001,9 @@ def modmail_db_updater(conversation, reddit, cursor, db_conn):
     replies = [reply.id for reply in message.replies]
     if exists and exists[1] == message.replies:
         return True
-    cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, replies, subject, author, body, dest) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET replies = EXCLUDED.replies, dest = EXCLUDED.dest, sent_to_discord = false", (message.id, convert_time(message.created_utc), message.first_message_name, replies, message.subject, str(message.author), message.body, str(message.dest)))
+    cursor.execute("INSERT INTO modmail (id, created_utc, replies, subject, author, body, dest, new_modmail_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET replies = EXCLUDED.replies, dest = EXCLUDED.dest, sent_to_discord = false", (message.id, convert_time(message.created_utc), replies, message.subject, str(message.author), message.body, str(message.dest), conversation.id))
     for reply in message.replies:
-        cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, subject, author, parent_id, body) VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), reply.first_message_name, reply.subject, str(reply.author), reply.parent_id, reply.body))
+        cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, subject, author, parent_id, body, new_modmail_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), f"t4_{conversation.legacy_first_message_id}", reply.subject, str(reply.author), reply.parent_id, reply.body, conversation.id))
     db_conn.commit()
     return False
 
