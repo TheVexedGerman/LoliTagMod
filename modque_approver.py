@@ -766,11 +766,11 @@ def run_bot(reddit, cursor, db_conn):
     print("Fetching modlog")
     modlog_loop(reddit, "Animemes", cursor, db_conn)
 
+    print("Fetching New Modmail")
+    new_modmail_fetcher(reddit, "Animemes", cursor, db_conn)
     # fetch modmail
     print("Fetching Modmail")
     modmail_fetcher(reddit, "Animemes", cursor, db_conn)
-    print("Fetching New Modmail")
-    new_modmail_fetcher(reddit, "Animemes", cursor, db_conn)
 
     # Update the post flairs in the DB
     print("Updating DB flairs")
@@ -1003,7 +1003,7 @@ def modmail_db_updater(conversation, reddit, cursor, db_conn):
         return True
     cursor.execute("INSERT INTO modmail (id, created_utc, replies, subject, author, body, dest, new_modmail_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET replies = EXCLUDED.replies, dest = EXCLUDED.dest, sent_to_discord = false", (message.id, convert_time(message.created_utc), replies, message.subject, str(message.author), message.body, str(message.dest), conversation.id))
     for reply in message.replies:
-        cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, subject, author, parent_id, body, new_modmail_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), f"t4_{conversation.legacy_first_message_id}", reply.subject, str(reply.author), reply.parent_id, reply.body, conversation.id))
+        cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, subject, author, parent_id, body, new_modmail_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), message.name, reply.subject, str(reply.author), reply.parent_id, reply.body, conversation.id))
     db_conn.commit()
     return False
 
@@ -1033,7 +1033,7 @@ def generate_awards_css():
 
 def get_mail(reddit, cursor, db_conn):
     for message in reddit.inbox.all(limit=None):
-        cursor.execute("SELECT id, replies FROM modmail WHERE id = %s", [message.id])
+        cursor.execute("SELECT id, replies FROM sachimail WHERE id = %s", [message.id])
         replies = [reply.id for reply in message.replies]
         exists = cursor.fetchone()
         if exists and exists[1] == message.replies:
