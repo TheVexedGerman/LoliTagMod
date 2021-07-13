@@ -613,6 +613,11 @@ def update_awards(post, reddit, cursor, db_conn):
             pass
     except:
         return
+    cursor.execute("SELECT DISTINCT award_id, count(*) FROM awards_history WHERE post_id = %s GROUP BY award_id", (post.id,))
+    old_awards = cursor.fetchall()
+    old_awards_dict = {}
+    for oa in old_awards:
+        old_awards_dict.update({oa[0]: oa[1]})
     for award in post.all_awardings:
         if not check_awards_membership(award):
             cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
@@ -623,6 +628,20 @@ def update_awards(post, reddit, cursor, db_conn):
             awards_css = generate_awards_css()
             stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
             sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
+        #Check if the award already is in the DB
+        if old_awards_dict.get(award['id']):
+            #Set the number of iterations to the new - the old
+            iterations = award['count']-old_awards_dict.get(award['id'])
+        else:
+            iterations = award['count']
+        for i in range(iterations):
+            # Add the award as many times as it already appears on the post
+            try:
+                cursor.execute("INSERT INTO awards_history (award_id, added_utc, post_id) VALUES (%s, %s, %s)", (award['id'], datetime.datetime.utcnow(), post.id))
+            except Exception as e:
+                db_conn.rollback()
+                print(traceback.format_exc())
+        db_conn.commit()
 
 def new_posts_loop(reddit, subreddit, cursor, db_conn):
     current_new_post_list = []
