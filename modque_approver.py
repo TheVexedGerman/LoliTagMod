@@ -1000,10 +1000,10 @@ def modmail_fetcher(reddit, subreddit, cursor, db_conn):
         for reply in message.replies:
             cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, subject, author, parent_id, body) VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), reply.first_message_name, reply.subject, str(reply.author), reply.parent_id, reply.body))
         db_conn.commit()
-    for message in reddit.subreddit(subreddit).mod.unread(limit=None):
-        cursor.execute("INSERT INTO modmail (id, created_utc, subject, author, body, dest) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (message.id, convert_time(message.created_utc), message.subject, str(message.author), message.body, str(message.dest)))
-        db_conn.commit()
-        message.mark_read()
+    # for message in reddit.subreddit(subreddit).mod.unread(limit=None):
+    #     cursor.execute("INSERT INTO modmail (id, created_utc, subject, author, body, dest) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (message.id, convert_time(message.created_utc), message.subject, str(message.author), message.body, str(message.dest)))
+    #     db_conn.commit()
+    #     message.mark_read()
 
 def new_modmail_fetcher(reddit, subreddit, cursor, db_conn):
     for conversation in reddit.subreddit(subreddit).modmail.conversations(limit=1000, state='all'):
