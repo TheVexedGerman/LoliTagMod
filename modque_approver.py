@@ -1006,18 +1006,32 @@ def modmail_fetcher(reddit, subreddit, cursor, db_conn):
     #     message.mark_read()
 
 def new_modmail_fetcher(reddit, subreddit, cursor, db_conn):
-    for conversation in reddit.subreddit(subreddit).modmail.conversations(limit=1000, state='all'):
-        exists = modmail_db_updater(conversation, reddit, cursor, db_conn)
-        if exists:
-            break
+    # check archives first since the others produce new archives.
     for conversation in reddit.subreddit(subreddit).modmail.conversations(limit=1000, state='archived'):
         exists = modmail_db_updater(conversation, reddit, cursor, db_conn)
         if exists:
             break
-    for conversation in reddit.subreddit(subreddit).modmail.conversations(limit=1000, state='appeals'):
-        exists = modmail_db_updater(conversation, reddit, cursor, db_conn)
-        if exists:
-            break
+    for state in ['all', 'appeals']:    
+        for conversation in reddit.subreddit(subreddit).modmail.conversations(limit=1000, state=state):
+            modmail_db_updater(conversation, reddit, cursor, db_conn)
+            if conversation.is_highlighted:
+                continue
+            if not conversation.last_user_update:
+                continue
+            if not conversation.last_mod_update:
+                # Archive if user is ignored for 14 days.
+                if datetime.datetime.strptime(conversation.last_updated, "%Y-%m-%dT%H:%M:%S.%f%z").timestamp() < (datetime.datetime.utcnow() - datetime.timedelta(days=14)).timestamp()
+                continue
+            if not conversation.last_updated:
+                continue
+            # Archive if latest reply is from a mod.
+            if datetime.datetime.strptime(conversation.last_mod_update, "%Y-%m-%dT%H:%M:%S.%f%z").timestamp() > datetime.datetime.strptime(conversation.last_user_update, "%Y-%m-%dT%H:%M:%S.%f%z").timestamp():
+                conversation.archive()
+                continue
+            # Archive if a mod answered and the last user reply is older than 7 days.
+            if datetime.datetime.strptime(conversation.last_updated, "%Y-%m-%dT%H:%M:%S.%f%z").timestamp() < (datetime.datetime.utcnow() - datetime.timedelta(days=14)).timestamp():
+                conversation.archive()
+                continue
 
 def modmail_db_updater(conversation, reddit, cursor, db_conn):
     message = reddit.inbox.message(conversation.legacy_first_message_id)
