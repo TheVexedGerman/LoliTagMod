@@ -1020,7 +1020,8 @@ def new_modmail_fetcher(reddit, subreddit, cursor, db_conn):
                 continue
             if not conversation.last_mod_update:
                 # Archive if user is ignored for 14 days.
-                if datetime.datetime.strptime(conversation.last_updated, "%Y-%m-%dT%H:%M:%S.%f%z").timestamp() < (datetime.datetime.utcnow() - datetime.timedelta(days=14)).timestamp()
+                if datetime.datetime.strptime(conversation.last_updated, "%Y-%m-%dT%H:%M:%S.%f%z").timestamp() < (datetime.datetime.utcnow() - datetime.timedelta(days=14)).timestamp():
+                    conversation.archive()
                 continue
             if not conversation.last_updated:
                 continue
@@ -1029,7 +1030,7 @@ def new_modmail_fetcher(reddit, subreddit, cursor, db_conn):
                 conversation.archive()
                 continue
             # Archive if a mod answered and the last user reply is older than 7 days.
-            if datetime.datetime.strptime(conversation.last_updated, "%Y-%m-%dT%H:%M:%S.%f%z").timestamp() < (datetime.datetime.utcnow() - datetime.timedelta(days=14)).timestamp():
+            if datetime.datetime.strptime(conversation.last_updated, "%Y-%m-%dT%H:%M:%S.%f%z").timestamp() < (datetime.datetime.utcnow() - datetime.timedelta(days=7)).timestamp():
                 conversation.archive()
                 continue
 
