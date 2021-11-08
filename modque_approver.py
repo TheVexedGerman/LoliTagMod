@@ -372,23 +372,22 @@ class modque_approver():
                 self.cursor.execute("INSERT INTO event_removals (id, created_utc, mod, target_id, event) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (ID) DO NOTHING", (log_entry[0], log_entry[1], log_entry[2], removal_suspect.id, "NSFW Spoiler"))
 
 
-    def approve_no_dignity_repost_reports(reports, cursor, db_conn):
+    def approve_no_dignity_repost_reports(self, reports):
         try:
             # check if there is a template ID (through AttributeError) and if the template ID matches the old repost one
             # if reports.link_flair_template_id == "9a07b400-3c37-11e9-a73e-0e2a828fd580":
             if "no dignity" in reports.link_flair_text.lower():
                 print(reports.title)
                 approve = True
-                report_dict = make_dict(reports.user_reports)
+                report_dict = self.make_dict(reports.user_reports)
                 for report in reports.user_reports:
                     # if the report contains repost it can be ignored.
                     if "repost" not in report[0].lower():
                         approve = False
                         break
-                if not approve and reports.id not in watched_id_set:
-                    print("closer check loop")
-                    cursor.execute("SELECT reports_json FROM repost_report_check WHERE id = %s", [reports.id])
-                    reference_dict = cursor.fetchone()
+                if not approve and reports.id not in self.watched_id_set:
+                    self.cursor.execute("SELECT reports_json FROM repost_report_check WHERE id = %s", [reports.id])
+                    reference_dict = self.cursor.fetchone()
                     # Make sure an entry exits before assignment, otherwise create empty dict
                     if reference_dict:
                         reference_dict = reference_dict[0]
@@ -400,27 +399,23 @@ class modque_approver():
                             continue
                         # compare the entry to the stored one if they don't match set watch and break out of loop
                         if report_dict.get(entry) != reference_dict.get(entry):
-                            watched_id_set.add(reports.id)
-                            watched_id_report_dict.update({reports.id:report_dict})
-                            update_db(reports.id, report_dict, cursor, db_conn)
-                            print("No approval")
+                            self.watched_id_set.add(reports.id)
+                            self.watched_id_report_dict.update({reports.id:report_dict})
+                            self.update_db(reports.id, report_dict)
                             approve = False
                             break
                         approve = True
                 # approve the post and go back to the beginning of the loop        
                 if approve:
-                    print("Approved")
                     reports.mod.approve()
-                    update_db(reports.id, report_dict, cursor, db_conn)
+                    self.update_db(reports.id, report_dict)
                     return
         except AttributeError:
             pass
 
 
-    def check_dupebro_for_redundant_info(comment):
+    def check_dupebro_for_redundant_info(self, comment):
         matches = re.findall(r'(?<=https://reddit.com/r/Animemes/comments/)[a-z0-9]{1,6}', comment.body)
-        # print(comment.body)
-        # print(matches)
         submission_comments = comment.submission.comments.list()
         ab_comment = None
         for com in submission_comments:
@@ -429,23 +424,19 @@ class modque_approver():
                 # break
         if not ab_comment:
             return
-        # print(ab_comment.body)
         ab_matches = re.findall(r'(?<=https:\/\/redd.it\/)[a-z0-9]{1,6}', ab_comment.body)
         matches = set(matches)
         try:
             matches.remove(comment.submission.id)
         except ValueError:
             pass
-        print(matches)
-        print(ab_matches)
         all_matches_contained = all(item in ab_matches for item in matches)
         if all_matches_contained:
-            print("removeing")
             comment.mod.remove()
         return
 
 
-    def remove_shadowbanned_comments(comment):
+    def remove_shadowbanned_comments(self, comment):
         try:
             # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
             # python checks for the existence of an object instead of just a bool.
@@ -462,66 +453,64 @@ class modque_approver():
 
 
 
-    def check_for_sholi_links(comment):
-        has_numbers, has_redaction = check_for_violation(comment.body)
+    def check_for_sholi_links(self, comment):
+        has_numbers, has_redaction = self.check_for_violation(comment.body)
         if has_numbers:
             if not has_redaction:
-                print("Approving Comment")
                 comment.mod.approve()
                 return True
             else:
-                print("Removing Comment")
                 comment.mod.remove(spam=False, mod_note='Sholi link')
                 return True
         return False
 
 
-    def check_for_broken_comment_spoilers(comment):
+    def check_for_broken_comment_spoilers(self, comment):
         broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
         if broken_spoiler:
             reply = comment.reply(SPOILER_REMOVAL_COMMENT)
             reply.mod.distinguish(how='yes')
             comment.mod.remove(mod_note="Incorrectly formatted spoiler")
-            if spoiler_comment_dict.get(comment.id):
-                spoiler_comment_dict[comment.id] = datetime.datetime.now()
+            if self.spoiler_comment_dict.get(comment.id):
+                self.spoiler_comment_dict[comment.id] = datetime.datetime.now()
             else:
-                spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
-            save_spoiler_dict(spoiler_comment_dict)
+                self.spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
+            self.save_spoiler_dict(self.spoiler_comment_dict)
             return True
         return False
 
-    def gilded_posts_loop(reddit, subreddit, cursor, db_conn):
-        for post in reddit.subreddit(subreddit).gilded(limit=100):
-            update_awards(post, reddit, cursor, db_conn)
-            check_flairs_and_update_if_different(post, cursor, db_conn)
+    def gilded_posts_loop(self):
+        for post in self.subreddit.gilded(limit=100):
+            self.update_awards(post)
+            self.check_flairs_and_update_if_different(post)
 
 
-    def hot_posts_loop(reddit, subreddit, cursor, db_conn):
-        for post in reddit.subreddit(subreddit).hot(limit=100):
-            update_awards(post, reddit, cursor, db_conn)
+    def hot_posts_loop(self):
+        for post in self.subreddit.hot(limit=100):
+            self.update_awards(post)
             #update user flairs with changes.
-            check_flairs_and_update_if_different(post, cursor, db_conn)
+            self.check_flairs_and_update_if_different(post)
 
 
-    def update_awards(post, reddit, cursor, db_conn):
+    def update_awards(self, post):
         try:
             if post.all_awardings:
                 pass
         except:
             return
-        cursor.execute("SELECT DISTINCT award_id, count(*) FROM awards_history WHERE post_id = %s GROUP BY award_id", (post.id,))
-        old_awards = cursor.fetchall()
+        self.cursor.execute("SELECT DISTINCT award_id, count(*) FROM awards_history WHERE post_id = %s GROUP BY award_id", (post.id,))
+        old_awards = self.cursor.fetchall()
         old_awards_dict = {}
         for oa in old_awards:
             old_awards_dict.update({oa[0]: oa[1]})
         for award in post.all_awardings:
-            if not check_awards_membership(award):
-                cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
-                db_conn.commit()
-                awards_dict.update({award['id']: award['name']})
-                sub = reddit.subreddit(PARSED_SUBREDDIT)
+            if not self.check_awards_membership(award):
+                self.cursor.execute("INSERT INTO awards (id, name) VALUES (%s, %s)", (award['id'], award['name']))
+                self.db_conn.commit()
+                self.awards_dict.update({award['id']: award['name']})
+                sub = self.subreddit
                 stylesheet = sub.stylesheet().stylesheet
-                awards_css = generate_awards_css()
+                awards_css = self.generate_awards_css()
                 stylesheet = re.sub(r'(?<=\/\* Auto managed awards section start \*\/).*?(?=\/\* Auto managed awards section end \*\/)', awards_css, stylesheet, flags=re.DOTALL)
                 sub.stylesheet.update(stylesheet, f"Automatic update to add the {award['name']} award")
             #Check if the award already is in the DB
@@ -533,21 +522,21 @@ class modque_approver():
             for i in range(iterations):
                 # Add the award as many times as it already appears on the post
                 try:
-                    cursor.execute("INSERT INTO awards_history (award_id, added_utc, post_id) VALUES (%s, %s, %s)", (award['id'], datetime.datetime.utcnow(), post.id))
+                    self.cursor.execute("INSERT INTO awards_history (award_id, added_utc, post_id) VALUES (%s, %s, %s)", (award['id'], datetime.datetime.utcnow(), post.id))
                     # if award['id'] == 'award_d360b82a-1152-42de-9f76-b3bf88d48a62':
                     #     cursor.execute("UPDATE user_teams SET power_up = %s, power_up_timestamp = %s", ('Ganbare', datetime.datetime.utcnow()))
                 except Exception as e:
-                    db_conn.rollback()
+                    self.db_conn.rollback()
                     print(traceback.format_exc())
                 
                 # Maximum Useless
                 # if award['id'] == 'award_3f0ee040-3403-4d15-9237-e2ced6a5c8e9':
                 #     ban_user(reddit, post.author, "Got Maximum Useless Award", "You win some, you lose some. Seems like someone wanted you out of the race so much they gave your post a Maximum Useless award, which at the moment does have the use of giving the recipient a temp ban. See you soon \^\_\^", 1, "Automated ban for getting Maximum Useless")
-            db_conn.commit()
+            self.db_conn.commit()
 
-    def new_posts_loop(reddit, subreddit, cursor, db_conn):
+    def new_posts_loop(self):
         current_new_post_list = []
-        for submission in reddit.subreddit(subreddit).new(limit=100):
+        for submission in self.subreddit.new(limit=100):
             # make a list of current new posts
             current_new_post_list.append(submission.id)
 
@@ -556,42 +545,40 @@ class modque_approver():
                 submission.report('Possibly missing spoiler tag')
 
             # check if the post is spoiler marked but not titled correctly:
-            if check_for_improper_title_spoiler_marks(submission):
+            if self.check_for_improper_title_spoiler_marks(submission):
                 continue
 
             # check if the post is nsfw tagged but not spoiler tagged:
             # check_for_nsfw_tagging(submission)
 
             # Check if the image is below the minimum resolution
-            if check_for_minimum_image_size(submission, cursor):
+            if self.check_for_minimum_image_size(submission):
                 continue
 
-        global new_post_list
-        new_post_list = post_new_posts_loop(new_post_list, current_new_post_list, cursor)
-        db_conn.commit()
+        self.new_post_list = self.post_new_posts_loop(current_new_post_list)
+        self.db_conn.commit()
 
-    def post_new_posts_loop(new_post_list, current_new_post_list, cursor):
-        if new_post_list:
+    def post_new_posts_loop(self, current_new_post_list):
+        if self.new_post_list:
             # determine the offset between the old and the new list
-            offset = get_offset(current_new_post_list, new_post_list)
-            for i, entry in enumerate(new_post_list):
+            offset = self.get_offset(current_new_post_list)
+            for i, entry in enumerate(self.new_post_list):
                 # exit if the end of new list has been reached.
                 if i + offset >= len(current_new_post_list):
                     break
-                else:
-                    # improve this so it doesn't automatically go to the next entry.
-                    # check if the ids are identical
-                    if entry != current_new_post_list[i+offset]:
-                        print(f"{entry} was removed")
-                        cursor.execute("UPDATE posts SET estimated_deletion_time = %s WHERE id = %s", (datetime.datetime.now(), entry))
-                        # move the offset one back because the new list is now missing one entry.
-                        offset += -1
+
+                # improve this so it doesn't automatically go to the next entry.
+                # check if the ids are identical
+                if entry != current_new_post_list[i+offset]:
+                    self.cursor.execute("UPDATE posts SET estimated_deletion_time = %s WHERE id = %s", (datetime.datetime.now(), entry))
+                    # move the offset one back because the new list is now missing one entry.
+                    offset += -1
         # set the new list to be the one checked next time
         return current_new_post_list
 
-    def check_for_minimum_image_size(submission, cursor):
-        cursor.execute("SELECT count(*) FROM sachimod_ignore_posts WHERE id = %s", (submission.id,))
-        skip_count = cursor.fetchone()
+    def check_for_minimum_image_size(self, submission):
+        self.cursor.execute("SELECT count(*) FROM sachimod_ignore_posts WHERE id = %s", (submission.id,))
+        skip_count = self.cursor.fetchone()
         if skip_count and skip_count[0] > 0:
             return False
         # cursor.execute("SELECT id FROM sachimod_ignore_posts WHERE created_utc > %s", (datetime.datetime.now()-datetime.timedelta(days=1),))
@@ -616,13 +603,13 @@ class modque_approver():
         return False
 
             
-    def check_for_nsfw_tagging(submission):
+    def check_for_nsfw_tagging(self, submission):
         if submission.over_18:
             if '[nsfw]' not in submission.title.lower():
                 submission.mod.remove()
                 submission.flair.select('eeaebb92-8b38-11ea-a432-0e232b3ed13d')
             
-    def check_for_improper_title_spoiler_marks(submission):
+    def check_for_improper_title_spoiler_marks(self, submission):
         # check for spoiler tag but not properly formatted title
         if submission.spoiler:
             # check title for spoiler formatting
@@ -644,12 +631,12 @@ class modque_approver():
                     return True
         return False
 
-    def edited_comments_loop(reddit, subreddit, cursor, db_conn):
+    def edited_comments_loop(self):
         # cursor.execute("SELECT comment_id, comment_edited FROM edited_comments_repo ORDER BY comment_edited desc")
         # latest_edited = cursor.fetchone()
-        for comment in reddit.subreddit(subreddit).mod.edited(only='comments', limit=100):
+        for comment in self.subreddit.mod.edited(only='comments', limit=100):
             # Skip handling if the comment is made by a sub mod
-            if comment.author in subreddit_moderators:
+            if comment.author in self.subreddit_moderators:
                 continue
             # # Check for older edited spoiler tag broken comments
             # if comment.id in list(spoiler_comment_dict.keys()):
@@ -658,76 +645,94 @@ class modque_approver():
             # Remove any comment that if newer than the latest_edited
             # skip any comment and newer that already has an entry
             try:
-                cursor.execute("INSERT INTO edited_comments_repo (comment_id, comment_edited, comment_body, parent_post_id, comment_username) VALUES (%s, %s, %s, %s, %s)", (comment.id, convert_time(comment.edited), comment.body, comment.submission.id, str(comment.author)))
-                db_conn.commit()
+                self.cursor.execute(
+                                        """INSERT INTO edited_comments_repo (
+                                            comment_id,
+                                            comment_edited,
+                                            comment_body,
+                                            parent_post_id,
+                                            comment_username
+                                        )
+                                        VALUES (%s, %s, %s, %s, %s)
+                                        """,
+                                        (
+                                            comment.id,
+                                            self.convert_time(comment.edited),
+                                            comment.body,
+                                            comment.submission.id,
+                                            str(comment.author)
+                                        )
+                                    )
+                self.db_conn.commit()
                 # comment.mod.remove()
             except psycopg2.errors.UniqueViolation:
-                db_conn.rollback()
+                self.db_conn.rollback()
                 break
             # if latest_edited and comment.id == latest_edited[0] and convert_time(comment.edited) == latest_edited[1]:
             #     break
 
             #update user flairs with changes.
-            check_flairs_and_update_if_different(comment, cursor, db_conn)
+            self.check_flairs_and_update_if_different(comment)
 
-    def comments_loop(reddit, subreddit, cursor, db_conn):
-        for comment in reddit.subreddit(subreddit).comments(limit=100):
-            check_flairs_and_update_if_different(comment, cursor, db_conn)
+    def comments_loop(self):
+        for comment in self.subreddit.comments(limit=100):
+            self.check_flairs_and_update_if_different(comment)
 
-    def run_bot(reddit, cursor, db_conn):
+    def run_bot(self):
         print("Current time: " + str(datetime.datetime.now().time()))
         # modqueue loop
         print("Fetching modqueue...")
-        modqueue_loop(reddit, "Animemes", cursor, db_conn)
+        self.modqueue_loop()
         # new posts loop
         print("Checking new")
-        new_posts_loop(reddit, "Animemes", cursor, db_conn)
+        self.new_posts_loop()
 
         # fetch the modlog
         print("Fetching modlog")
-        modlog_loop(reddit, "Animemes", cursor, db_conn)
+        self.modlog_loop()
 
         print("Fetching New Modmail")
-        new_modmail_fetcher(reddit, "Animemes", cursor, db_conn)
+        self.new_modmail_fetcher()
         # fetch modmail
         print("Fetching Modmail")
-        modmail_fetcher(reddit, "Animemes", cursor, db_conn)
+        self.modmail_fetcher()
 
         # Update the post flairs in the DB
         print("Updating DB flairs")
-        update_flairs_in_the_db(reddit, cursor, db_conn)
+        self.update_flairs_in_the_db()
 
         # Get account messages and put them into the appropriate DB
         print("Getting mail")
-        get_mail(reddit, cursor, db_conn)
+        self.get_mail()
 
         # gilded posts loop
         print("Checking gilded posts")
-        gilded_posts_loop(reddit, "Animemes", cursor, db_conn)
+        self.gilded_posts_loop()
 
         # hot posts loop
         print("Checking hot posts")
-        hot_posts_loop(reddit, "Animemes", cursor, db_conn)
+        self.hot_posts_loop()
         
         print("Checking edited comments")
-        edited_comments_loop(reddit, "Animemes", cursor, db_conn)
+        self.edited_comments_loop()
 
         print("Checking for edited broken spoiler comments")
         # check comments that are too new to show up in edited for spoiler updates
         # check_for_updated_comments(reddit)
 
         print("Checking new comments")
-        comments_loop(reddit, "Animemes", cursor, db_conn)
+        self.comments_loop()
 
-        print(reddit.auth.limits)
+        print(self.reddit.auth.limits)
         print("Sleeping for 30 seconds...")
         time.sleep(30)
 
 
-    def check_for_violation(comment):
+    def check_for_violation(self, comment):
+        #TODO Rewrite to work with updated nhentaitagbot modules
         print("checkforviolation being run")
         numbers_combi = bot.scanForURL(comment)
-        improper_nhentai_numbers = check_for_improper_urls(comment)
+        improper_nhentai_numbers = self.check_for_improper_urls(comment)
         if numbers_combi and improper_nhentai_numbers:
             for element in improper_nhentai_numbers:
                 numbers_combi[0].append(element)
@@ -759,14 +764,14 @@ class modque_approver():
         return False, isRedacted
 
 
-    def get_offset(new, old):
+    def get_offset(self, new, old):
         try:
             return new.index(old[0])
         except ValueError:
-            return get_offset(new, old[1:])
+            return self.get_offset(new, old[1:])
             
 
-    def check_for_improper_urls(comment):
+    def check_for_improper_urls(self, comment):
         improper_nhentai_numbers = re.findall(r'((:?www.)?nhentai.net\/g\/.*?)(\d{1,6})', comment)
         try:
             improper_nhentai_numbers = [int(number[2]) for number in improper_nhentai_numbers]
@@ -775,26 +780,24 @@ class modque_approver():
         return improper_nhentai_numbers
 
 
-
-
-    def update_db(post_id, reports_dict, cursor, db_conn):
-        cursor.execute("SELECT * FROM repost_report_check WHERE id = %s", [post_id])
-        entry_exists = cursor.fetchone()
+    def update_db(self, post_id, reports_dict):
+        self.cursor.execute("SELECT * FROM repost_report_check WHERE id = %s", [post_id])
+        entry_exists = self.cursor.fetchone()
         if entry_exists:
-            cursor.execute("UPDATE repost_report_check SET reports_json = %s, timestamp = %s WHERE id = %s", (json.dumps(reports_dict), datetime.datetime.now(), post_id))
+            self.cursor.execute("UPDATE repost_report_check SET reports_json = %s, timestamp = %s WHERE id = %s", (json.dumps(reports_dict), datetime.datetime.now(), post_id))
         else:
-            cursor.execute("INSERT INTO repost_report_check (id, timestamp, reports_json) VALUES (%s, %s, %s)", (post_id, datetime.datetime.now(), json.dumps(reports_dict)))
-        db_conn.commit()
+            self.cursor.execute("INSERT INTO repost_report_check (id, timestamp, reports_json) VALUES (%s, %s, %s)", (post_id, datetime.datetime.now(), json.dumps(reports_dict)))
+        self.db_conn.commit()
 
 
-    def make_dict(reports):
+    def make_dict(self, reports):
         report_dict = {}
         for report in reports:
             report_dict.update({report[0]:report[1]})
         return report_dict
 
 
-    def approve_flagged_but_now_spoiler_tagged_memes(reports):
+    def approve_flagged_but_now_spoiler_tagged_memes(self, reports):
         if not reports.mod_reports:
             return
         if len(reports.mod_reports) > 1:
@@ -806,7 +809,7 @@ class modque_approver():
             if reports.spoiler:
                 reports.mod.approve()
 
-    def approve_weekend_reaction_meme_reposts(reports, reddit):
+    def approve_weekend_reaction_meme_reposts(self, reports):
         if not reports.mod_reports:
             return
         if reports.user_reports:
@@ -821,7 +824,7 @@ class modque_approver():
                             print(posts)
                             if len(posts) == 1:
                                 try:
-                                    if reddit.submission(id=posts[0]).link_flair_template_id == '1dda8d90-501e-11e8-98b7-0e6fcedead42':
+                                    if self.reddit.submission(id=posts[0]).link_flair_template_id == '1dda8d90-501e-11e8-98b7-0e6fcedead42':
                                         reports.mod.approve()
                                 except AttributeError:
                                     return
@@ -829,12 +832,12 @@ class modque_approver():
                         continue
 
 
-    def approve_weekend_reaction_memes(reports, cursor, db_conn):
+    def approve_weekend_reaction_memes(self, reports):
         print(reports.title)
         approve = True
         is_reaction = False
-        report_dict = make_dict(reports.user_reports)
-        if convert_time(reports.created_utc).weekday() < 5:
+        report_dict = self.make_dict(reports.user_reports)
+        if self.convert_time(reports.created_utc).weekday() < 5:
             return
         if not reports.user_reports:
             return
@@ -845,10 +848,10 @@ class modque_approver():
             else:
                 print("is reaction")
                 is_reaction = True
-        if is_reaction and not approve and reports.id not in watched_id_set:
+        if is_reaction and not approve and reports.id not in self.watched_id_set:
             print("closer check loop reaction meme")
-            cursor.execute("SELECT reports_json FROM repost_report_check WHERE id = %s", [reports.id])
-            reference_dict = cursor.fetchone()
+            self.cursor.execute("SELECT reports_json FROM repost_report_check WHERE id = %s", [reports.id])
+            reference_dict = self.cursor.fetchone()
             # Make sure an entry exits before assignment, otherwise create empty dict
             if reference_dict:
                 reference_dict = reference_dict[0]
@@ -859,9 +862,9 @@ class modque_approver():
                     continue
                 # compare the entry to the stored one if they don't match set watch and break out of loop
                 if report_dict.get(entry) != reference_dict.get(entry):
-                    watched_id_set.add(reports.id)
-                    watched_id_report_dict.update({reports.id:report_dict})
-                    update_db(reports.id, report_dict, cursor, db_conn)
+                    self.watched_id_set.add(reports.id)
+                    self.watched_id_report_dict.update({reports.id:report_dict})
+                    self.update_db(reports.id, report_dict)
                     print("No approval")
                     approve = False
                     break
@@ -869,40 +872,89 @@ class modque_approver():
             # approve the post and go back to the beginning of the loop        
         if approve and is_reaction:
             reports.mod.approve()
-            update_db(reports.id, report_dict, cursor, db_conn)
+            self.update_db(reports.id, report_dict)
 
 
-    def convert_time(time):
+    def convert_time(self, time):
         if time:
             return datetime.datetime.utcfromtimestamp(time)
         return None
 
 
-    def modmail_fetcher(reddit, subreddit, cursor, db_conn):
-        for message in reddit.subreddit(subreddit).mod.inbox(limit=None):
-            cursor.execute("SELECT id, replies FROM modmail WHERE id = %s", [message.id])
+    def modmail_fetcher(self):
+        for message in self.subreddit.mod.inbox(limit=None):
+            self.cursor.execute("SELECT id, replies FROM modmail WHERE id = %s", [message.id])
             replies = [reply.id for reply in message.replies]
-            exists = cursor.fetchone()
+            exists = self.cursor.fetchone()
             if exists and exists[1] == message.replies:
                 break
-            cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, replies, subject, author, body, dest) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET replies = EXCLUDED.replies, dest = EXCLUDED.dest, sent_to_discord = false", (message.id, convert_time(message.created_utc), message.first_message_name, replies, message.subject, str(message.author), message.body, str(message.dest)))
+            self.cursor.execute("""
+                                    INSERT INTO modmail (
+                                        id,
+                                        created_utc,
+                                        first_message_name,
+                                        replies,
+                                        subject,
+                                        author,
+                                        body,
+                                        dest
+                                    )
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) 
+                                    ON CONFLICT (id) DO UPDATE SET
+                                        replies = EXCLUDED.replies,
+                                        dest = EXCLUDED.dest,
+                                        sent_to_discord = false
+                                    """,
+                                    (
+                                        message.id,
+                                        self.convert_time(message.created_utc),
+                                        message.first_message_name,
+                                        replies,
+                                        message.subject,
+                                        str(message.author),
+                                        message.body,
+                                        str(message.dest)
+                                    )
+                                )
             for reply in message.replies:
-                cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, subject, author, parent_id, body) VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), reply.first_message_name, reply.subject, str(reply.author), reply.parent_id, reply.body))
-            db_conn.commit()
+                self.cursor.execute("""
+                                        INSERT INTO modmail (
+                                            id, 
+                                            created_utc, 
+                                            first_message_name, 
+                                            subject, 
+                                            author, 
+                                            parent_id, 
+                                            body
+                                        ) 
+                                        VALUES (%s, %s, %s, %s, %s, %s, %s) 
+                                        ON CONFLICT (id) DO NOTHING
+                                        """, 
+                                        (
+                                            reply.id,
+                                            self.convert_time(reply.created_utc),
+                                            reply.first_message_name,
+                                            reply.subject,
+                                            str(reply.author),
+                                            reply.parent_id,
+                                            reply.body
+                                        )
+                                    )
+            self.db_conn.commit()
         # for message in reddit.subreddit(subreddit).mod.unread(limit=None):
         #     cursor.execute("INSERT INTO modmail (id, created_utc, subject, author, body, dest) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (message.id, convert_time(message.created_utc), message.subject, str(message.author), message.body, str(message.dest)))
         #     db_conn.commit()
         #     message.mark_read()
 
-    def new_modmail_fetcher(reddit, subreddit, cursor, db_conn):
+    def new_modmail_fetcher(self):
         # check archives first since the others produce new archives.
-        for conversation in reddit.subreddit(subreddit).modmail.conversations(limit=1000, state='archived'):
-            exists = modmail_db_updater(conversation, reddit, cursor, db_conn)
+        for conversation in self.subreddit.modmail.conversations(limit=1000, state='archived'):
+            exists = self.modmail_db_updater(conversation)
             if exists:
                 break
         for state in ['all', 'appeals']:    
-            for conversation in reddit.subreddit(subreddit).modmail.conversations(limit=1000, state=state):
-                modmail_db_updater(conversation, reddit, cursor, db_conn)
+            for conversation in self.subreddit.modmail.conversations(limit=1000, state=state):
+                self.modmail_db_updater(conversation)
                 if conversation.is_highlighted:
                     continue
                 # # Archive delted conversations
@@ -941,14 +993,15 @@ class modque_approver():
         return False
 
 
-    def check_awards_membership(award):
+    # WTF is this, am I going mad?
+    def check_awards_membership(self, award):
         # just try to see if the key is in the dict
-        if awards_dict.get(award['id']):
+        if self.awards_dict.get(award['id']):
             return True
         return False
 
 
-    def get_awards_dict(cursor):
+    def get_awards_dict(self, cursor):
         dic = {}
         cursor.execute("SELECT id, name FROM awards")
         awards = cursor.fetchall()
@@ -957,46 +1010,46 @@ class modque_approver():
         return dic
 
 
-    def generate_awards_css():
+    def generate_awards_css(self):
         css_string = '\n'
-        for key in awards_dict.keys():
-            css_string += f'a.awarding-link[data-award-id$="{key[-6:]}"]:hover:before {{\n    content: "{awards_dict[key]}";\n}}\n'
+        for key in self.awards_dict.keys():
+            css_string += f'a.awarding-link[data-award-id$="{key[-6:]}"]:hover:before {{\n    content: "{self.awards_dict[key]}";\n}}\n'
         return css_string
 
 
-    def get_mail(reddit, cursor, db_conn):
-        for message in reddit.inbox.all(limit=None):
-            cursor.execute("SELECT id, replies FROM sachimail WHERE id = %s", [message.id])
+    def get_mail(self):
+        for message in self.reddit.inbox.all(limit=None):
+            self.cursor.execute("SELECT id, replies FROM sachimail WHERE id = %s", [message.id])
             replies = [reply.id for reply in message.replies]
-            exists = cursor.fetchone()
+            exists = self.cursor.fetchone()
             if exists and exists[1] == message.replies:
                 break
-            cursor.execute("INSERT INTO sachimail (id, created_utc, first_message_name, replies, subject, author, body, was_comment, parent_id, context) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (message.id, convert_time(message.created_utc), message.first_message_name, replies, message.subject, str(message.author), message.body, message.was_comment, message.parent_id, message.context))
+            self.cursor.execute("INSERT INTO sachimail (id, created_utc, first_message_name, replies, subject, author, body, was_comment, parent_id, context) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (message.id, convert_time(message.created_utc), message.first_message_name, replies, message.subject, str(message.author), message.body, message.was_comment, message.parent_id, message.context))
             for reply in message.replies:
-                cursor.execute("INSERT INTO sachimail (id, created_utc, first_message_name, subject, author, parent_id, body, was_comment, context) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), reply.first_message_name, reply.subject, str(reply.author), reply.parent_id, reply.body, reply.was_comment, message.context))
-            db_conn.commit()
+                self.cursor.execute("INSERT INTO sachimail (id, created_utc, first_message_name, subject, author, parent_id, body, was_comment, context) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), reply.first_message_name, reply.subject, str(reply.author), reply.parent_id, reply.body, reply.was_comment, message.context))
+            self.db_conn.commit()
 
 
-    def save_spoiler_dict(spoiler_dict):
+    def save_spoiler_dict(self, spoiler_dict):
         with open("spoiler_comment_dict.json", "w") as f:
-            f.write(str(json.dumps(spoiler_dict, default=convert_datetime)))
+            f.write(str(json.dumps(spoiler_dict, default=self.convert_datetime)))
 
-    def load_spoiler_dict():
+    def load_spoiler_dict(self):
         #TODO make sure the dict get's loaded with the datetime
         if not os.path.isfile("spoiler_comment_dict.json"):
             json_obj = {}
         else:
             try:
                 with open("spoiler_comment_dict.json", "r") as f:
-                    json_obj = json.loads(f.read(), object_pairs_hook=convert_str_to_datetime)
+                    json_obj = json.loads(f.read(), object_pairs_hook=self.convert_str_to_datetime)
             except json.decoder.JSONDecodeError:
                 json_obj = {}
         return json_obj
 
-    def convert_datetime(date):
+    def convert_datetime(self, date):
             return date.isoformat()
 
-    def convert_str_to_datetime(pairs):
+    def convert_str_to_datetime(self, pairs):
         dic = {}
         for key, value in pairs:
             if isinstance(value, str):
@@ -1009,36 +1062,37 @@ class modque_approver():
                 dic[key] = value            
         return dic
 
-    def check_for_updated_comments(reddit):
+    def check_for_updated_comments(self):
         # Check recent comments because ninja edits don't show up in the edited page.
-        for comment_id in list(spoiler_comment_dict.keys()):
-            if spoiler_comment_dict[comment_id] + datetime.timedelta(minutes=3) < datetime.datetime.now():
-                comment = reddit.comment(id=comment_id)
-                check_if_broken_spoiler_is_fixed_and_approve(comment)
+        for comment_id in list(self.spoiler_comment_dict.keys()):
+            if self.spoiler_comment_dict[comment_id] + datetime.timedelta(minutes=3) < datetime.datetime.now():
+                comment = self.reddit.comment(id=comment_id)
+                self.check_if_broken_spoiler_is_fixed_and_approve(comment)
         # clean up old comments that are unlikely to be edited.
-        for key in list(spoiler_comment_dict.keys()):
-            if spoiler_comment_dict[key] < (datetime.datetime.now() - datetime.timedelta(days=1)):
-                del spoiler_comment_dict[key]
-        save_spoiler_dict(spoiler_comment_dict)
+        for key in list(self.spoiler_comment_dict.keys()):
+            if self.spoiler_comment_dict[key] < (datetime.datetime.now() - datetime.timedelta(days=1)):
+                del self.spoiler_comment_dict[key]
+        self.save_spoiler_dict(self.spoiler_comment_dict)
 
-    def check_if_broken_spoiler_is_fixed_and_approve(comment):
+    def check_if_broken_spoiler_is_fixed_and_approve(self, comment):
         broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
         if not broken_spoiler:
             comment.mod.approve()
-            del spoiler_comment_dict[comment.id]
+            del self.spoiler_comment_dict[comment.id]
 
-    def check_flairs_and_update_if_different(flair_item, cursor, db_conn):
+    def check_flairs_and_update_if_different(self, flair_item):
         if flair_item.author_flair_css_class or flair_item.author_flair_text:
-            cursor.execute("SELECT flair_text, flair_css_class FROM user_flairs WHERE redditor = %s", (str(flair_item.author),))
-            exists = cursor.fetchone()
+            self.cursor.execute("SELECT flair_text, flair_css_class FROM user_flairs WHERE redditor = %s", (str(flair_item.author),))
+            exists = self.cursor.fetchone()
             flair_text = flair_item.author_flair_text if flair_item.author_flair_text else ''
             flair_css_class = flair_item.author_flair_css_class if flair_item.author_flair_css_class else ''
+            # Why is there a distinction here if the query is the same?
             if exists and (exists[0] != flair_text or exists[1] != flair_css_class):
-                cursor.execute("INSERT INTO user_flairs (redditor, flair_text, flair_css_class) VALUES (%s, %s, %s) ON CONFLICT (redditor) DO UPDATE SET redditor = EXCLUDED.redditor, flair_text = EXCLUDED.flair_text, flair_css_class = EXCLUDED.flair_css_class, sent_to_discord = False", (str(flair_item.author), flair_text, flair_css_class))
-                db_conn.commit()
+                self.cursor.execute("INSERT INTO user_flairs (redditor, flair_text, flair_css_class) VALUES (%s, %s, %s) ON CONFLICT (redditor) DO UPDATE SET redditor = EXCLUDED.redditor, flair_text = EXCLUDED.flair_text, flair_css_class = EXCLUDED.flair_css_class, sent_to_discord = False", (str(flair_item.author), flair_text, flair_css_class))
+                self.db_conn.commit()
             elif not exists:
-                cursor.execute("INSERT INTO user_flairs (redditor, flair_text, flair_css_class) VALUES (%s, %s, %s) ON CONFLICT (redditor) DO UPDATE SET redditor = EXCLUDED.redditor, flair_text = EXCLUDED.flair_text, flair_css_class = EXCLUDED.flair_css_class, sent_to_discord = False", (str(flair_item.author), flair_text, flair_css_class))
-                db_conn.commit()
+                self.cursor.execute("INSERT INTO user_flairs (redditor, flair_text, flair_css_class) VALUES (%s, %s, %s) ON CONFLICT (redditor) DO UPDATE SET redditor = EXCLUDED.redditor, flair_text = EXCLUDED.flair_text, flair_css_class = EXCLUDED.flair_css_class, sent_to_discord = False", (str(flair_item.author), flair_text, flair_css_class))
+                self.db_conn.commit()
 
 
 if __name__ == '__main__':
