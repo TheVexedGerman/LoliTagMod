@@ -9,13 +9,14 @@ import json
 import psycopg2
 import psycopg2.errors
 import traceback
+import yaml
+import sys
 #imports the site wrappers for the sites from the nhentai bot
 import wrapper.nhentai as nhentai
 import wrapper.tsumino as tsumino
 import wrapper.ehentai as ehentai
 import wrapper.hitomila as hitomila
 import wrapper.nHentaiTagBot as bot
-import postgres_credentials_modque
 
 
 nhentaiKey = 0
@@ -57,49 +58,57 @@ This was not an action taken by the /r/Animemes mods, but a site admin for somet
 
 
 
-def authenticate():
+def authenticate(user):
     print("Authenticating...")
     reddit = praw.Reddit(
-        'sachimod'
-        # 'lolitagmod'
+        user
         )
     print("Authenticated as {}".format(reddit.user.me()))
     return reddit
 
-def authenticate_db():
+def authenticate_db(config):
     db_conn = psycopg2.connect(
-    host = postgres_credentials_modque.HOST,
-    database = postgres_credentials_modque.DATABASE,
-    user = postgres_credentials_modque.USER,
-    password = postgres_credentials_modque.PASSWORD
+    host = config.get('postgres_credentials').get('host'),
+    database = config.get('postgres_credentials').get('database'),
+    user = config.get('postgres_credentials').get('user'),
+    password = config.get('postgres_credentials').get('password')
     )
     return db_conn, db_conn.cursor()
 
 
-def main():
-    reddit = authenticate()
-    db_conn, cursor = authenticate_db()
+def load_config(path):
+    with open(path, 'r') as f:
+        config = yaml.load(f)
+    return config
+
+def main(config_path):
+    config = load_config(config_path)
+    reddit = authenticate(config.get('config').get('bot_user'))
+    db_conn, cursor = authenticate_db(config.get('config'))
 
     # run_bot()
+    modque_approver = ModqueApprover(reddit, cursor, db_conn, config)
     while True:
-        run_bot(reddit, cursor, db_conn)
+        modque_approver.run_bot()
 
 
-class modque_approver():
+class ModqueApprover():
 
-    def __init__(self, reddit, cursor, db_conn, subreddit):
+    def __init__(self, reddit, cursor, db_conn, config):
         self.reddit = reddit
         self.cursor = cursor
         self.db_conn = db_conn
-        self.subreddit = self.reddit.subreddit(subreddit)
+        self.config = config
+        self.subreddit = self.reddit.subreddit(config.get(config).get('subreddit'))
 
+        self.features_enabled = {}
         self.watched_id_set = set()
         self.watched_id_report_dict = {}
         self.awards_dict = self.get_awards_dict()
         # Initialize the dictionary for spoiler comments which have been formatted incorrectly
         self.spoiler_comment_dict = self.load_spoiler_dict()
         # get the mods of the sub so you can ignore them
-        self.subreddit_moderators = reddit.subreddit(PARSED_SUBREDDIT).moderator()
+        self.subreddit_moderators = self.subreddit.moderator()
         self.robots = ['AutoModerator', 'SachiMod', 'AnimemesBot']
 
     def modqueue_loop(self):
@@ -115,12 +124,11 @@ class modque_approver():
 
                     # automatically approve comments where the Sleuth couldn't find a repost
                     if item.author.name == 'RepostSleuthBot':
-                        if "I didn't find any posts that meet the matching requirements for r/Animemes. \n\nIt might be OC, it might not." in item.body:
+                        if "I didn't find any posts that meet the matching requirements for r/Animemes.\n\nIt might be OC, it might not." in item.body:
                             item.mod.approve()
                             continue
 
                     if item.author.name == 'DupeBro':
-                        print('checking for similar matches with DupeBro')
                         self.check_dupebro_for_redundant_info(item)
                         continue
 
@@ -143,7 +151,7 @@ class modque_approver():
             # do post loops acttions
             elif item.name[:2] == 't3':
                 # if it is the weekend approve reaction memes
-                if datetime.datetime.now().weekday() > 4:
+                if datetime.datetime.utcnow().weekday() > 4:
                     self.approve_weekend_reaction_meme_reposts(item)
 
                 # Automatically approve memes reported for reaction meme on the weekend.
@@ -472,9 +480,9 @@ class modque_approver():
             reply.mod.distinguish(how='yes')
             comment.mod.remove(mod_note="Incorrectly formatted spoiler")
             if self.spoiler_comment_dict.get(comment.id):
-                self.spoiler_comment_dict[comment.id] = datetime.datetime.now()
+                self.spoiler_comment_dict[comment.id] = datetime.datetime.utcnow()
             else:
-                self.spoiler_comment_dict.update({comment.id: datetime.datetime.now()})
+                self.spoiler_comment_dict.update({comment.id: datetime.datetime.utcnow()})
             self.save_spoiler_dict(self.spoiler_comment_dict)
             return True
         return False
@@ -570,7 +578,7 @@ class modque_approver():
                 # improve this so it doesn't automatically go to the next entry.
                 # check if the ids are identical
                 if entry != current_new_post_list[i+offset]:
-                    self.cursor.execute("UPDATE posts SET estimated_deletion_time = %s WHERE id = %s", (datetime.datetime.now(), entry))
+                    self.cursor.execute("UPDATE posts SET estimated_deletion_time = %s WHERE id = %s", (datetime.datetime.utcnow(), entry))
                     # move the offset one back because the new list is now missing one entry.
                     offset += -1
         # set the new list to be the one checked next time
@@ -581,7 +589,7 @@ class modque_approver():
         skip_count = self.cursor.fetchone()
         if skip_count and skip_count[0] > 0:
             return False
-        # cursor.execute("SELECT id FROM sachimod_ignore_posts WHERE created_utc > %s", (datetime.datetime.now()-datetime.timedelta(days=1),))
+        # cursor.execute("SELECT id FROM sachimod_ignore_posts WHERE created_utc > %s", (datetime.datetime.utcnow()-datetime.timedelta(days=1),))
         # stored_ignore = cursor.fetchall()
         # if stored_ignore:
         #     ignore_list = [entry[0] for entry in stored_ignore]
@@ -679,7 +687,7 @@ class modque_approver():
             self.check_flairs_and_update_if_different(comment)
 
     def run_bot(self):
-        print("Current time: " + str(datetime.datetime.now().time()))
+        print("Current time: " + str(datetime.datetime.utcnow().time()))
         # modqueue loop
         print("Fetching modqueue...")
         self.modqueue_loop()
@@ -784,9 +792,9 @@ class modque_approver():
         self.cursor.execute("SELECT * FROM repost_report_check WHERE id = %s", [post_id])
         entry_exists = self.cursor.fetchone()
         if entry_exists:
-            self.cursor.execute("UPDATE repost_report_check SET reports_json = %s, timestamp = %s WHERE id = %s", (json.dumps(reports_dict), datetime.datetime.now(), post_id))
+            self.cursor.execute("UPDATE repost_report_check SET reports_json = %s, timestamp = %s WHERE id = %s", (json.dumps(reports_dict), datetime.datetime.utcnow(), post_id))
         else:
-            self.cursor.execute("INSERT INTO repost_report_check (id, timestamp, reports_json) VALUES (%s, %s, %s)", (post_id, datetime.datetime.now(), json.dumps(reports_dict)))
+            self.cursor.execute("INSERT INTO repost_report_check (id, timestamp, reports_json) VALUES (%s, %s, %s)", (post_id, datetime.datetime.utcnow(), json.dumps(reports_dict)))
         self.db_conn.commit()
 
 
@@ -1065,12 +1073,12 @@ class modque_approver():
     def check_for_updated_comments(self):
         # Check recent comments because ninja edits don't show up in the edited page.
         for comment_id in list(self.spoiler_comment_dict.keys()):
-            if self.spoiler_comment_dict[comment_id] + datetime.timedelta(minutes=3) < datetime.datetime.now():
+            if self.spoiler_comment_dict[comment_id] + datetime.timedelta(minutes=3) < datetime.datetime.utcnow():
                 comment = self.reddit.comment(id=comment_id)
                 self.check_if_broken_spoiler_is_fixed_and_approve(comment)
         # clean up old comments that are unlikely to be edited.
         for key in list(self.spoiler_comment_dict.keys()):
-            if self.spoiler_comment_dict[key] < (datetime.datetime.now() - datetime.timedelta(days=1)):
+            if self.spoiler_comment_dict[key] < (datetime.datetime.utcnow() - datetime.timedelta(days=1)):
                 del self.spoiler_comment_dict[key]
         self.save_spoiler_dict(self.spoiler_comment_dict)
 
@@ -1098,8 +1106,12 @@ class modque_approver():
 if __name__ == '__main__':
     while True:
         try:
-            main()
+            if len(sys.argv) != 2:
+                config_path = 'modque_approver.yaml'
+            else:
+                config_path = sys.argv[1]
+            main(config_path)
         except Exception as e:
             print(traceback.format_exc())
-            open("log.txt", 'a').write(f"{datetime.datetime.now().time()}:\n{traceback.format_exc()}\n")
+            open("log.txt", 'a').write(f"{datetime.datetime.utcnow().time()}:\n{traceback.format_exc()}\n")
             pass
