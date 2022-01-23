@@ -111,6 +111,8 @@ def main():
     db_conn, cursor = authenticate_db()
     while True:
         run_bot()
+        print("Sleeping for 30 seconds...")
+        time.sleep(30)
 
 
 if __name__ == '__main__':
