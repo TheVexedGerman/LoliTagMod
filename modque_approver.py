@@ -109,7 +109,7 @@ class ModqueApprover():
         self.spoiler_comment_dict = self.load_spoiler_dict()
         # get the mods of the sub so you can ignore them
         self.subreddit_moderators = self.subreddit.moderator()
-        self.robots = ['AutoModerator', 'SachiMod', 'AnimemesBot']
+        # self.robots = ['AutoModerator', 'SachiMod', 'AnimemesBot']
 
     def modqueue_loop(self):
         for item in self.subreddit.mod.modqueue(limit=None):
@@ -118,16 +118,19 @@ class ModqueApprover():
                 # skip if author has no name
                 if item.author:
                     # automatically approve comments made by the bot
-                    if item.author.name == 'AnimemesBot' or item.author.name == 'AutoModerator':
-                        item.mod.approve()
-                        continue
-
-                    # automatically approve comments where the Sleuth couldn't find a repost
-                    if item.author.name == 'RepostSleuthBot':
-                        if "I didn't find any posts that meet the matching requirements for r/Animemes.\n\nIt might be OC, it might not." in item.body:
+                    if self.config['feature'].get('auto_approve_bot_mod_comments'):
+                        if item.author.name == 'AnimemesBot' or item.author.name == 'AutoModerator':
                             item.mod.approve()
                             continue
 
+                    # automatically approve comments where the Sleuth couldn't find a repost
+                    if self.config['feature'].get('auto_approve_repostsleuthbot_no_repost_posts'):
+                        if item.author.name == 'RepostSleuthBot':
+                            if f"I didn't find any posts that meet the matching requirements for r/{self.subreddit.display_name}.\n\nIt might be OC, it might not." in item.body:
+                                item.mod.approve()
+                                continue
+                    
+                    # automatically remove dupebro reported comments if dupebro contains no new information compared to custom repost bot
                     if item.author.name == 'DupeBro':
                         self.check_dupebro_for_redundant_info(item)
                         continue
@@ -136,29 +139,34 @@ class ModqueApprover():
                 if self.check_for_sholi_links(item):
                     continue
 
-                # approve a comment if it is older than 3 minutes and contains a simple phrase
-                if self.approve_non_ninja_simple_comments(item):
-                    continue
+                # # approve a comment if it is older than 3 minutes and contains a simple phrase
+                # if self.config['feature'].get('auto_approve_remove_sholicon_links'):
+                #     if self.approve_non_ninja_simple_comments(item):
+                #         continue
 
                 # check of the comment has a broken spoiler
-                # if check_for_broken_comment_spoilers(item):
-                #     continue
+                if self.check_for_broken_comment_spoilers(item):
+                    continue
 
                 # remove comments from shadowbanned users and leave a comment for those users.
-                # if remove_shadowbanned_comments(item):
-                #     continue
+                if self.remove_shadowbanned_comments(item):
+                    continue
 
-            # do post loops acttions
+            # do post loops actions
             elif item.name[:2] == 't3':
                 # if it is the weekend approve reaction memes
-                if datetime.datetime.utcnow().weekday() > 4:
-                    self.approve_weekend_reaction_meme_reposts(item)
+                if self.config['feature'].get('auto_approve_weekend_reaction_meme_reposts'):
+                    if datetime.datetime.utcnow().weekday() > 4:
+                        # TODO make it dependent on post time and not local time
+                        self.approve_weekend_reaction_meme_reposts(item)
 
                 # Automatically approve memes reported for reaction meme on the weekend.
-                self.approve_weekend_reaction_memes(item)
+                if self.config['feature'].get('auto_approve_weekend_reaction_meme_reports'):
+                    self.approve_weekend_reaction_memes(item)
 
                 # Automatically approve memes that got reported for not having a spoiler, but have gotten tagged in the meantime.
-                self.approve_flagged_but_now_spoiler_tagged_memes(item)
+                if self.config['feature'].get('auto_approve_flagged_but_now_spoiler_tagged_memes'):
+                    self.approve_flagged_but_now_spoiler_tagged_memes(item)
             
             #update user flairs with changes.
             self.check_flairs_and_update_if_different(item)
@@ -423,11 +431,13 @@ class ModqueApprover():
 
 
     def check_dupebro_for_redundant_info(self, comment):
+        if not self.config['feature'].get('auto_remove_dupebot_if_all_provided_links_are_redundant'):
+            return
         matches = re.findall(r'(?<=https://reddit.com/r/Animemes/comments/)[a-z0-9]{1,6}', comment.body)
         submission_comments = comment.submission.comments.list()
         ab_comment = None
         for com in submission_comments:
-            if com.author.name == 'AnimemesBot':
+            if com.author.name == self.config['config'].get('custom_repost_bot'):
                 ab_comment = com
                 # break
         if not ab_comment:
@@ -445,6 +455,8 @@ class ModqueApprover():
 
 
     def remove_shadowbanned_comments(self, comment):
+        if not self.config['feature'].get('auto_remove_and_reply_to_shadowbanned_users'):
+            return
         try:
             # shadowbanned comments appear to be removed by True, so as dumb as this check would be in a typed language
             # python checks for the existence of an object instead of just a bool.
@@ -462,6 +474,8 @@ class ModqueApprover():
 
 
     def check_for_sholi_links(self, comment):
+        if not self.config['feature'].get('auto_approve_remove_sholicon_links'):
+            return
         has_numbers, has_redaction = self.check_for_violation(comment.body)
         if has_numbers:
             if not has_redaction:
@@ -474,6 +488,8 @@ class ModqueApprover():
 
 
     def check_for_broken_comment_spoilers(self, comment):
+        if not self.config['feature'].get('auto_remove_and_reply_to_broken_spoiler_comments'):
+            return
         broken_spoiler = re.search(r'(?<!(`|\\))>!\s+', comment.body)
         if broken_spoiler:
             reply = comment.reply(SPOILER_REMOVAL_COMMENT)
@@ -1089,6 +1105,8 @@ class ModqueApprover():
             del self.spoiler_comment_dict[comment.id]
 
     def check_flairs_and_update_if_different(self, flair_item):
+        if not self.config['feature'].get('track_user_flair_changes'):
+            return
         if flair_item.author_flair_css_class or flair_item.author_flair_text:
             self.cursor.execute("SELECT flair_text, flair_css_class FROM user_flairs WHERE redditor = %s", (str(flair_item.author),))
             exists = self.cursor.fetchone()
