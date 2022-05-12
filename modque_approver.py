@@ -1035,6 +1035,8 @@ def new_modmail_fetcher(reddit, subreddit, cursor, db_conn):
                 continue
 
 def modmail_db_updater(conversation, reddit, cursor, db_conn):
+    if not conversation.legacy_first_message_id:
+        return False
     message = reddit.inbox.message(conversation.legacy_first_message_id)
     cursor.execute("SELECT id, replies FROM modmail WHERE id = %s", [message.id])
     exists = cursor.fetchone()
