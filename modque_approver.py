@@ -10,11 +10,13 @@ import psycopg2
 import psycopg2.errors
 import traceback
 #imports the site wrappers for the sites from the nhentai bot
-import wrapper.nhentai as nhentai
-import wrapper.tsumino as tsumino
-import wrapper.ehentai as ehentai
-import wrapper.hitomila as hitomila
-import wrapper.nHentaiTagBot as bot
+from wrapper.nhentai import Nhentai
+from wrapper.ehentai import Ehentai
+from wrapper.tsumino import Tsumino
+# import wrapper.hitomila as hitomila
+
+from wrapper.DBConn import Database
+from wrapper.nHentaiTagBot import NHentaiTagBot as TagBot
 import postgres_credentials_modque
 
 
@@ -265,6 +267,17 @@ def main():
     # get the mods of the sub so you can ignore them
     global subreddit_moderators
     subreddit_moderators = reddit.subreddit(PARSED_SUBREDDIT).moderator()
+
+    #loli/shota tag checking
+    database = Database()
+    global nhentai
+    nhentai = Nhentai(database)
+    global tsumino
+    tsumino = Tsumino(database)
+    global ehentai
+    ehentai = Ehentai(database)
+    global bot
+    bot = TagBot(None, database)
 
     # run_bot()
     while True:
@@ -833,32 +846,27 @@ def check_for_violation(comment):
     numbers_combi = bot.scanForURL(comment)
     improper_nhentai_numbers = check_for_improper_urls(comment)
     if numbers_combi and improper_nhentai_numbers:
-        for element in improper_nhentai_numbers:
-            numbers_combi[0].append(element)
+        numbers_combi += improper_nhentai_numbers
     elif not numbers_combi and improper_nhentai_numbers:
-        numbers_combi = [improper_nhentai_numbers, [], [], []]
-    combination = []
+        numbers_combi = improper_nhentai_numbers
     isRedacted = False
     if numbers_combi:
-        for i, entry in enumerate(numbers_combi):
-            for subentry in entry:
-                combination.append([subentry, i])
-        if combination:
-            for entry in combination:
-                number = entry[0]
-                key = entry[1]
-                if key == nhentaiKey:
-                    processedData = nhentai.analyseNumber(number)
-                elif key == tsuminoKey:
-                    processedData = tsumino.analyseNumber(number)
-                elif key == ehentaiKey:
-                    processedData = ehentai.analyseNumber(number)
-                elif key == hitomilaKey:
-                    processedData = hitomila.analyseNumber(number)
-                if len(processedData) > 1:
-                    if processedData[-1]:
-                        isRedacted = True
-                        break
+        for entry in numbers_combi:
+            number = entry.get("number")
+            key = entry.get("type")
+            if key == 'nhentai':
+                processedData = nhentai.analyseNumber(number)
+            elif key == 'tsumino':
+                processedData = tsumino.analyseNumber(number)
+            elif key == 'ehentai':
+                processedData = ehentai.analyseNumber(number)
+            # elif key == hitomilaKey:
+            #     processedData = hitomila.analyseNumber(number)
+            if processedData.get('isRedacted'):
+                isRedacted = True
+                break
+            if processedData.get('error'):
+                return False, False
         return True, isRedacted
     return False, isRedacted
 
