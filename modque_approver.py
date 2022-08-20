@@ -669,8 +669,8 @@ def new_posts_loop(reddit, subreddit, cursor, db_conn):
         current_new_post_list.append(submission.id)
 
         # check for spoiler formatted title but no spoiler tag
-        if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[redacted]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
-            submission.report('Possibly missing spoiler tag')
+        # if '[oc]' not in submission.title.lower() and '[nsfw]' not in submission.title.lower() and '[redacted]' not in submission.title.lower() and '[' in submission.title and ']' in submission.title and not submission.spoiler:
+        #     submission.report('Possibly missing spoiler tag')
 
         # check if the post is spoiler marked but not titled correctly:
         if check_for_improper_title_spoiler_marks(submission):
