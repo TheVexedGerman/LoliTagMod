@@ -651,15 +651,15 @@ def update_awards(post, reddit, cursor, db_conn):
             # Add the award as many times as it already appears on the post
             try:
                 cursor.execute("INSERT INTO awards_history (award_id, added_utc, post_id) VALUES (%s, %s, %s)", (award['id'], datetime.datetime.utcnow(), post.id))
-                # if award['id'] == 'award_d360b82a-1152-42de-9f76-b3bf88d48a62':
-                #     cursor.execute("UPDATE user_teams SET power_up = %s, power_up_timestamp = %s", ('Ganbare', datetime.datetime.utcnow()))
+                if award['id'] == 'award_d360b82a-1152-42de-9f76-b3bf88d48a62':
+                    cursor.execute("UPDATE user_teams SET power_up = %s, power_up_timestamp = %s", ('Ganbare', datetime.datetime.utcnow()))
             except Exception as e:
                 db_conn.rollback()
                 print(traceback.format_exc())
             
             # Maximum Useless
-            # if award['id'] == 'award_3f0ee040-3403-4d15-9237-e2ced6a5c8e9':
-            #     ban_user(reddit, post.author, "Got Maximum Useless Award", "You win some, you lose some. Seems like someone wanted you out of the race so much they gave your post a Maximum Useless award, which at the moment does have the use of giving the recipient a temp ban. See you soon \^\_\^", 1, "Automated ban for getting Maximum Useless")
+            if award['id'] == 'award_3f0ee040-3403-4d15-9237-e2ced6a5c8e9':
+                ban_user(reddit, post.author, "Got Maximum Useless Award", "You win some, you lose some. Seems like someone wanted you out of the idol contest so much they gave your post a Maximum Useless award, which at the moment does have the use of giving the recipient a temp ban. See you soon \^\_\^", 1, "Automated ban for getting Maximum Useless")
         db_conn.commit()
 
 def new_posts_loop(reddit, subreddit, cursor, db_conn):
