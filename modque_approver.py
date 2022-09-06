@@ -668,8 +668,8 @@ def update_awards(post, reddit, cursor, db_conn):
                         with open('pin_store.txt', 'r') as f:
                             old_id = f.readline()
                         old_pin = reddit.submission(old_id)
-                        old_pin.mod.distinguish(sticky=False)
-                        post.mod.distinguish(sticky=True)
+                        old_pin.mod.sticky(state=False)
+                        post.mod.sticky(state=True)
                         with open('pin_store.txt', 'w') as f:
                             f.write(post.id)
                 except Exception as e:
