@@ -660,6 +660,20 @@ def update_awards(post, reddit, cursor, db_conn):
             # Maximum Useless
             if award['id'] == 'award_3f0ee040-3403-4d15-9237-e2ced6a5c8e9':
                 ban_user(reddit, post.author, "Got Maximum Useless Award", "You win some, you lose some. Seems like someone wanted you out of the idol contest so much they gave your post a Maximum Useless award, which at the moment does have the use of giving the recipient a temp ban. See you soon \^\_\^", 1, "Automated ban for getting Maximum Useless")
+            
+            # Keke's Advertising Service
+            if award['id'] == 'award_5de77dd3-fea9-4e6f-83d9-1df07ada8eb1':
+                try:
+                    if post.name[:2] == 't3':
+                        with open('pin_store.txt', 'r') as f:
+                            old_id = f.readline()
+                        old_pin = reddit.submission(old_id)
+                        old_pin.mod.distinguish(sticky=False)
+                        post.mod.distinguish(sticky=True)
+                        with open('pin_store.txt', 'w') as f:
+                            f.write(post.id)
+                except Exception as e:
+                    print(traceback.format_exc())
         db_conn.commit()
 
 def new_posts_loop(reddit, subreddit, cursor, db_conn):
