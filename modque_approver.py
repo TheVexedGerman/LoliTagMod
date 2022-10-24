@@ -1036,7 +1036,7 @@ def new_modmail_fetcher(reddit, subreddit, cursor, db_conn):
         exists = modmail_db_updater(conversation, reddit, cursor, db_conn)
         if exists:
             break
-    for state in ['all', 'appeals']:    
+    for state in ['all', 'appeals', 'mod']:    
         for conversation in reddit.subreddit(subreddit).modmail.conversations(limit=1000, state=state):
             modmail_db_updater(conversation, reddit, cursor, db_conn)
             if conversation.is_highlighted:
