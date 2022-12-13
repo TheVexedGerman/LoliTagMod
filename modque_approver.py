@@ -898,7 +898,7 @@ def get_offset(new, old):
 def check_for_improper_urls(comment):
     improper_nhentai_numbers = re.findall(r'((:?www.)?nhentai.net\/g\/.*?)(\d{1,6})', comment)
     try:
-        improper_nhentai_numbers = [int(number[2]) for number in improper_nhentai_numbers]
+        improper_nhentai_numbers = [{'number': int(number[2]), 'type': 'nhentai'} for number in improper_nhentai_numbers]
     except ValueError:
         improper_nhentai_numbers = []
     return improper_nhentai_numbers
