@@ -309,6 +309,10 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
                     check_dupebro_for_redundant_info(item)
                     continue
 
+            if 'mass edited with https://redact.dev/' in item.body:
+                item.mod.remove()
+                continue
+
             # check if the comment is linking to loli content
             if check_for_sholi_links(item):
                 continue
