@@ -308,8 +308,12 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
                     print('checking for similar matches with DupeBro')
                     check_dupebro_for_redundant_info(item)
                     continue
-
-            if 'mass edited with https://redact.dev/' in item.body:
+            
+            MASS_EDIT_INDICATOR_LIST = [
+                'mass edited with https://redact.dev/',
+                'mass edited with redact.dev',
+            ]
+            if any(indicator in item.body for indicator in MASS_EDIT_INDICATOR_LIST):
                 item.mod.remove()
                 continue
 
