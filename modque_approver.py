@@ -349,7 +349,7 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
         check_flairs_and_update_if_different(item, cursor, db_conn)
 
         #update awards
-        update_awards(item, reddit, cursor, db_conn)
+        # update_awards(item, reddit, cursor, db_conn)
 
 
 def approve_non_ninja_simple_comments(comment):
@@ -620,13 +620,13 @@ def check_for_broken_comment_spoilers(comment):
 
 def gilded_posts_loop(reddit, subreddit, cursor, db_conn):
     for post in reddit.subreddit(subreddit).gilded(limit=100):
-        update_awards(post, reddit, cursor, db_conn)
+        # update_awards(post, reddit, cursor, db_conn)
         check_flairs_and_update_if_different(post, cursor, db_conn)
 
 
 def hot_posts_loop(reddit, subreddit, cursor, db_conn):
     for post in reddit.subreddit(subreddit).hot(limit=100):
-        update_awards(post, reddit, cursor, db_conn)
+        # update_awards(post, reddit, cursor, db_conn)
         #update user flairs with changes.
         check_flairs_and_update_if_different(post, cursor, db_conn)
 
@@ -843,9 +843,9 @@ def run_bot(reddit, cursor, db_conn):
     print("Getting mail")
     get_mail(reddit, cursor, db_conn)
 
-    # gilded posts loop
-    print("Checking gilded posts")
-    gilded_posts_loop(reddit, "Animemes", cursor, db_conn)
+    # # gilded posts loop
+    # print("Checking gilded posts")
+    # gilded_posts_loop(reddit, "Animemes", cursor, db_conn)
 
     # hot posts loop
     print("Checking hot posts")
