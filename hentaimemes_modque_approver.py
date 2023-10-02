@@ -52,14 +52,14 @@ def run_bot():
     print("Fetching modqueue...")
     for comment in reddit.subreddit('hentaimemes').mod.modqueue(only='comments', limit=None):
         print(comment.body)
-        has_numbers, has_redaction = check_for_violation(comment.body)
-        if has_numbers:
-            if not has_redaction:
-                print("Approving Comment")
-                comment.mod.approve()
-            else:
-                print("Removing Comment")
-                comment.mod.remove(spam=False)
+        # has_numbers, has_redaction = check_for_violation(comment.body)
+        # if has_numbers:
+        #     if not has_redaction:
+        #         print("Approving Comment")
+        #         comment.mod.approve()
+        #     else:
+        #         print("Removing Comment")
+        #         comment.mod.remove(spam=False)
     grab_modlog()
     modmail_fetcher(reddit, 'hentaimemes', cursor, db_conn)
 
