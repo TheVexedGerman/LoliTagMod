@@ -310,10 +310,13 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
                     continue
             
             MASS_EDIT_INDICATOR_LIST = [
-                'mass edited with https://redact.dev/',
-                'mass edited with redact.dev',
+                # 'mass edited with https://redact.dev/',
+                # 'mass edited with redact.dev',
+                # '*This post was mass deleted and anonymized with [Redact](https://redact.dev)',
+                'redact.dev'
             ]
-            if any(indicator in item.body for indicator in MASS_EDIT_INDICATOR_LIST):
+            old_comment_report_automod = item.mod_reports and any(mod_report[1] == 'AutoModerator' and 'comment on old post' in mod_report[0] for mod_report in item.mod_reports)
+            if old_comment_report_automod and any(indicator in item.body for indicator in MASS_EDIT_INDICATOR_LIST):
                 item.mod.remove()
                 continue
 
