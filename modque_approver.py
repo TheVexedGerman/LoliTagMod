@@ -347,6 +347,11 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
 
             # Automatically approve memes that got reported for not having a spoiler, but have gotten tagged in the meantime.
             approve_flagged_but_now_spoiler_tagged_memes(item)
+
+            if item.author.name == 'Holofan4life':
+                if len(item.user_reports) == 1:
+                    if item.user_reports[0] == 'This is spam':
+                        item.mod.approve()
         
         #update user flairs with changes.
         check_flairs_and_update_if_different(item, cursor, db_conn)
