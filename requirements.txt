@@ -1,0 +1,2 @@
+praw
+psycopg2-binary
