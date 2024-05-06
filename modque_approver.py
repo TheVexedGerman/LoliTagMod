@@ -316,7 +316,7 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
                 'redact.dev'
             ]
             old_comment_report_automod = item.mod_reports and any(mod_report[1] == 'AutoModerator' and 'comment on old post' in mod_report[0] for mod_report in item.mod_reports)
-            if old_comment_report_automod and any(indicator in item.body for indicator in MASS_EDIT_INDICATOR_LIST):
+            if old_comment_report_automod and any(indicator in item.body.lower() for indicator in MASS_EDIT_INDICATOR_LIST):
                 item.mod.remove()
                 continue
 
@@ -329,8 +329,8 @@ def modqueue_loop(reddit, subreddit, cursor, db_conn):
                 continue
 
             # check of the comment has a broken spoiler
-            # if check_for_broken_comment_spoilers(item):
-            #     continue
+            if check_for_broken_comment_spoilers(item):
+                continue
 
             # remove comments from shadowbanned users and leave a comment for those users.
             # if remove_shadowbanned_comments(item):
@@ -802,8 +802,8 @@ def edited_comments_loop(reddit, subreddit, cursor, db_conn):
         if comment.author in subreddit_moderators:
             continue
         # # Check for older edited spoiler tag broken comments
-        # if comment.id in list(spoiler_comment_dict.keys()):
-        #     check_if_broken_spoiler_is_fixed_and_approve(comment)
+        if comment.id in list(spoiler_comment_dict.keys()):
+            check_if_broken_spoiler_is_fixed_and_approve(comment)
 
         # Remove any comment that if newer than the latest_edited
         # skip any comment and newer that already has an entry
