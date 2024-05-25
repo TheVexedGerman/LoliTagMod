@@ -864,7 +864,7 @@ def run_bot(reddit, cursor, db_conn):
 
     print("Checking for edited broken spoiler comments")
     # check comments that are too new to show up in edited for spoiler updates
-    # check_for_updated_comments(reddit)
+    check_for_updated_comments(reddit)
 
     print("Checking new comments")
     comments_loop(reddit, "Animemes", cursor, db_conn)
@@ -1162,7 +1162,7 @@ def convert_str_to_datetime(pairs):
 def check_for_updated_comments(reddit):
     # Check recent comments because ninja edits don't show up in the edited page.
     for comment_id in list(spoiler_comment_dict.keys()):
-        if spoiler_comment_dict[comment_id] + datetime.timedelta(minutes=3) < datetime.datetime.now():
+        if spoiler_comment_dict[comment_id] + datetime.timedelta(minutes=4) < datetime.datetime.now():
             comment = reddit.comment(id=comment_id)
             check_if_broken_spoiler_is_fixed_and_approve(comment)
     # clean up old comments that are unlikely to be edited.
