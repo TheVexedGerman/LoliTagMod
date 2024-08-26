@@ -799,8 +799,8 @@ def edited_comments_loop(reddit, subreddit, cursor, db_conn):
     # latest_edited = cursor.fetchone()
     for comment in reddit.subreddit(subreddit).mod.edited(only='comments', limit=100):
         # Skip handling if the comment is made by a sub mod
-        if comment.author in subreddit_moderators:
-            continue
+        # if comment.author in subreddit_moderators:
+        #     continue
         # # Check for older edited spoiler tag broken comments
         if comment.id in list(spoiler_comment_dict.keys()):
             check_if_broken_spoiler_is_fixed_and_approve(comment)
