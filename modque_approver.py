@@ -1084,6 +1084,8 @@ def modmail_db_updater(conversation, reddit, cursor, db_conn):
     # if not conversation.legacy_first_message_id:
     #     return False
     is_new_mm = conversation.legacy_first_message_id == None or 'MATRIXCHAT_!' in conversation.legacy_first_message_id
+    if conversation.legacy_first_message_id == '2hfj2mx':
+        return False
     if is_new_mm:
         messages = conversation.messages
         message = messages[0]
