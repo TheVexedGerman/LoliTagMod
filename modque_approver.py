@@ -837,9 +837,9 @@ def run_bot(reddit, cursor, db_conn):
     print("Fetching modlog")
     modlog_loop(reddit, "Animemes", cursor, db_conn)
 
-    #print("Fetching New Modmail")
-    #new_modmail_fetcher(reddit, "Animemes", cursor, db_conn)
-    ## fetch modmail
+    print("Fetching New Modmail")
+    new_modmail_fetcher(reddit, "Animemes", cursor, db_conn)
+    # fetch modmail
     print("Fetching Modmail")
     modmail_fetcher(reddit, "Animemes", cursor, db_conn)
 
@@ -1025,9 +1025,14 @@ def approve_weekend_reaction_memes(reports, cursor, db_conn):
 
 
 def convert_time(time):
-    if time:
-        return datetime.datetime.utcfromtimestamp(time)
-    return None
+    if not time:
+        return None
+    match time:
+        case int() | float():
+            return datetime.datetime.utcfromtimestamp(time)
+        case str():
+            return datetime.datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z").replace(tzinfo=None)
+    # return None
 
 
 def modmail_fetcher(reddit, subreddit, cursor, db_conn):
@@ -1052,7 +1057,7 @@ def new_modmail_fetcher(reddit, subreddit, cursor, db_conn):
         exists = modmail_db_updater(conversation, reddit, cursor, db_conn)
         if exists:
             break
-    for state in ['all', 'appeals', 'mod']:    
+    for state in ['all', 'appeals', 'mod']:
         for conversation in reddit.subreddit(subreddit).modmail.conversations(limit=1000, state=state):
             modmail_db_updater(conversation, reddit, cursor, db_conn)
             if conversation.is_highlighted:
@@ -1076,17 +1081,46 @@ def new_modmail_fetcher(reddit, subreddit, cursor, db_conn):
                 continue
 
 def modmail_db_updater(conversation, reddit, cursor, db_conn):
-    if not conversation.legacy_first_message_id:
-        return False
-    message = reddit.inbox.message(conversation.legacy_first_message_id)
+    # if not conversation.legacy_first_message_id:
+    #     return False
+    is_new_mm = conversation.legacy_first_message_id == None or 'MATRIXCHAT_!' in conversation.legacy_first_message_id
+    if is_new_mm:
+        messages = conversation.messages
+        message = messages[0]
+        replies = messages[1:]
+        body = message.body_markdown
+        subject = conversation.subject
+        created_utc = convert_time(message.date)
+        dest = str(conversation.participant)
+        # pprint.pprint(vars(messages))
+    else:
+        message = reddit.inbox.message(conversation.legacy_first_message_id)
+        body = message.body
+        replies = message.replies
+        subject = message.subject
+        created_utc = convert_time(message.created_utc)
+        dest = str(message.dest)
     cursor.execute("SELECT id, replies FROM modmail WHERE id = %s", [message.id])
+    reply_ids = [reply.id for reply in replies]
     exists = cursor.fetchone()
-    replies = [reply.id for reply in message.replies]
-    if exists and exists[1] == message.replies:
+    if exists and exists[1] == reply_ids:
         return True
-    cursor.execute("INSERT INTO modmail (id, created_utc, replies, subject, author, body, dest, new_modmail_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET replies = EXCLUDED.replies, dest = EXCLUDED.dest, sent_to_discord = false", (message.id, convert_time(message.created_utc), replies, message.subject, str(message.author), message.body, str(message.dest), conversation.id))
-    for reply in message.replies:
-        cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, subject, author, parent_id, body, new_modmail_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, convert_time(reply.created_utc), message.name, reply.subject, str(reply.author), reply.parent_id, reply.body, conversation.id))
+
+    cursor.execute("INSERT INTO modmail (id, created_utc, replies, subject, author, body, dest, new_modmail_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET replies = EXCLUDED.replies, dest = EXCLUDED.dest, sent_to_discord = false", (message.id, created_utc, reply_ids, subject, str(message.author), body, dest, conversation.id))
+    for reply in replies:
+        if is_new_mm:
+            rbody = reply.body_markdown
+            r_first_message_name = message.id
+            r_parent_id = message.id
+            r_created_utc = convert_time(reply.date)
+            r_subject = conversation.subject
+        else:
+            rbody = reply.body
+            r_first_message_name = message.name
+            r_parent_id = reply.parent_id
+            r_created_utc = convert_time(reply.created_utc)
+            r_subject = reply.subject
+        cursor.execute("INSERT INTO modmail (id, created_utc, first_message_name, subject, author, parent_id, body, new_modmail_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING", (reply.id, r_created_utc, r_first_message_name, r_subject, str(reply.author), r_parent_id, rbody, conversation.id))
     db_conn.commit()
     return False
 
