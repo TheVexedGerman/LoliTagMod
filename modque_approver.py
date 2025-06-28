@@ -837,9 +837,9 @@ def run_bot(reddit, cursor, db_conn):
     print("Fetching modlog")
     modlog_loop(reddit, "Animemes", cursor, db_conn)
 
-    print("Fetching New Modmail")
-    new_modmail_fetcher(reddit, "Animemes", cursor, db_conn)
-    # fetch modmail
+    #print("Fetching New Modmail")
+    #new_modmail_fetcher(reddit, "Animemes", cursor, db_conn)
+    ## fetch modmail
     print("Fetching Modmail")
     modmail_fetcher(reddit, "Animemes", cursor, db_conn)
 
