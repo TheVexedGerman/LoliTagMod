@@ -416,31 +416,75 @@ def update_watched_id_set(action, cursor, db_conn):
 def update_flairs_in_the_db(reddit, cursor, db_conn):
     cursor.execute("SELECT id, target_fullname FROM modlog WHERE action = 'editflair' and ban_processing = false ORDER BY created_utc DESC LIMIT 100")
     edit_flair_list = cursor.fetchall()
-    check_ids = []
-    # add all the fullnames into a list
-    for edited_flair in edit_flair_list:
-        if edited_flair[1]:
-            check_ids.append(edited_flair[1])
+    check_ids = [ef[1] for ef in edit_flair_list if ef[1]]
     # Fetch them all from reddit
-    if check_ids:
-        for removal_suspect in reddit.info(fullnames=check_ids):
-            try:
-                if removal_suspect.link_flair_template_id:
-                    pass
-            except AttributeError:
-                continue
-            cursor.execute("UPDATE posts SET link_flair_template_id = %s, link_flair_text = %s WHERE id = %s", (removal_suspect.link_flair_template_id, removal_suspect.link_flair_text, removal_suspect.id))
-            # Automated bans
-            # automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect)
+    if not check_ids:
+        return
+    for removal_suspect in reddit.info(fullnames=check_ids):
+        try:
+            if removal_suspect.link_flair_template_id:
+                pass
+        except AttributeError:
+            continue
+        cursor.execute("UPDATE posts SET link_flair_template_id = %s, link_flair_text = %s WHERE id = %s", (removal_suspect.link_flair_template_id, removal_suspect.link_flair_text, removal_suspect.id))
+        # Automated bans
+        # automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect)
+        automatic_ban_for_reposting(removal_suspect, reddit, cursor)
 
-            # Clean users with the proper flairs
-            # purge_and_clean(removal_suspect, cursor)
+        # Clean users with the proper flairs
+        # purge_and_clean(removal_suspect, cursor)
 
-            # Feed the event removals mirror db
-            event_removal_db_update(removal_suspect, cursor)
-        for entry in edit_flair_list:
-            cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
-        db_conn.commit()
+        # Feed the event removals mirror db
+        event_removal_db_update(removal_suspect, cursor)
+    for entry in edit_flair_list:
+        cursor.execute("UPDATE modlog SET ban_processing = true WHERE id = %s", (entry[0],))
+    db_conn.commit()
+
+
+def automatic_ban_for_reposting(removal_suspect, reddit, cursor):
+    # Repost flair ID
+    if not removal_suspect.link_flair_template_id == '222002f0-4f96-11e8-9c8f-0e384ac6db5e':
+        return
+    # Ensure text is unchanged
+    if not removal_suspect.link_flair_text == 'Rule 4: Repost':
+        return
+    # check if they have actually been removed
+    cursor.execute("SELECT id, action, target_author FROM modlog WHERE target_fullname = %s AND NOT action = 'editflair' ORDER BY created_utc DESC", (removal_suspect.name,))
+    current_state = cursor.fetchone()
+    if current_state and current_state[1] == 'removelink':
+        # ban the user
+        cursor.execute("""
+                       SELECT id
+                       FROM modlog
+                       WHERE target_author = %s
+                         AND mod = 'SachiMod'
+                         AND action = 'banuser'
+                         AND description like 'R4 Automated Ban:%'
+                       ORDER BY created_utc DESC""", (current_state[2],))
+        previous_violations = cursor.fetchall()
+        duration = 1
+        if previous_violations:
+            duration = fibonacci_iteration_calc(len(previous_violations))
+            if duration >= 999:
+                # Zero is perma
+                duration = 0
+        ban_user(reddit,
+                 current_state[2],
+                 duration = duration,
+                 ban_reason = "R4 Automated Ban",
+                 note = f"Automated ban for reposting a meme http://redd.it/{removal_suspect.id}",
+                 ban_message = """You've been banned for violating "Rule 4: No Reposts". Make sure to check your post hasn't been posted before on Animemes. For example, try using the reverse image search from google and "site:reddit.com" to do so. Making OC, however, is the best way to avoid posting a repost.'"""
+                 )
+        print(f"User: {current_state[2]} banned")
+
+def fibonacci_iteration_calc(iterations):
+    a = 1
+    b = 1
+    for i in range(iterations):
+        b_old = b
+        b = a + b
+        a = b_old
+    return b
 
 
 def automatic_ban_for_repeat_rule_breaking(reddit, cursor, removal_suspect):
