@@ -459,7 +459,7 @@ def automatic_ban_for_reposting(removal_suspect, reddit, cursor):
                        WHERE target_author = %s
                          AND mod = 'SachiMod'
                          AND action = 'banuser'
-                         AND description like 'R4 Automated Ban:%'
+                         AND description like 'R4 Automated Ban:%%'
                        ORDER BY created_utc DESC""", (current_state[2],))
         previous_violations = cursor.fetchall()
         duration = 1
